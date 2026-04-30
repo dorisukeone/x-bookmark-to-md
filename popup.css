@@ -96,6 +96,11 @@ body {
     color: #9CA3AF;
 }
 
+.field-hint-tight {
+    margin-top: -4px;
+    margin-bottom: 2px;
+}
+
 .btn-ghost {
     background: transparent;
     color: #9CA3AF;

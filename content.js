@@ -58,7 +58,12 @@ async function extractBookmarks(options = {}) {
     const maxScrollAttempts = 1000;
     let stableCount = 0;
 
-    console.log('Starting bookmark extraction...', { maxBookmarks, incrementalOnly: !!knownSet, knownCount: knownSet?.size || 0 });
+    console.log('Starting bookmark extraction...', {
+        maxBookmarks,
+        incrementalRequested: options.incrementalOnly,
+        urlFilterActive: !!knownSet,
+        knownUrlCount: knownSet ? knownSet.size : 0
+    });
 
     await waitForPageLoad();
 
@@ -117,29 +122,6 @@ async function extractBookmarks(options = {}) {
 
     console.log(`Extraction completed. Total bookmarks: ${result.length}`);
     return result;
-}
-
-function normalizeTweetUrl(url) {
-    if (!url || typeof url !== 'string') {
-        return '';
-    }
-    try {
-        const u = new URL(url, 'https://x.com');
-        u.search = '';
-        u.hash = '';
-        let host = (u.hostname || '').replace(/^www\./, '');
-        if (host === 'twitter.com' || host === 'mobile.twitter.com' || host === 'x.com') {
-            u.hostname = 'x.com';
-        }
-        u.protocol = 'https:';
-        let out = u.href;
-        if (out.endsWith('/')) {
-            out = out.slice(0, -1);
-        }
-        return out;
-    } catch {
-        return url.split('?')[0].split('#')[0];
-    }
 }
 
 function extractVisibleBookmarks() {

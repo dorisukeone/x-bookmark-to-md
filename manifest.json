@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "x-bookmark-to-md",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Chrome extension to export X bookmarks in Markdown format",
   "permissions": [
     "activeTab",
@@ -20,7 +20,7 @@
   "content_scripts": [
     {
       "matches": ["https://x.com/*", "https://twitter.com/*"],
-      "js": ["content.js"]
+      "js": ["url-utils.js", "content.js"]
     }
   ],
   "background": {

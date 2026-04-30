@@ -14,29 +14,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const exportHistoryMeta = document.getElementById('exportHistoryMeta');
     const clearHistoryBtn = document.getElementById('clearHistoryBtn');
 
-    function normalizeTweetUrl(url) {
-        if (!url || typeof url !== 'string') {
-            return '';
-        }
-        try {
-            const u = new URL(url, 'https://x.com');
-            u.search = '';
-            u.hash = '';
-            let host = (u.hostname || '').replace(/^www\./, '');
-            if (host === 'twitter.com' || host === 'mobile.twitter.com' || host === 'x.com') {
-                u.hostname = 'x.com';
-            }
-            u.protocol = 'https:';
-            let out = u.href;
-            if (out.endsWith('/')) {
-                out = out.slice(0, -1);
-            }
-            return out;
-        } catch {
-            return url.split('?')[0].split('#')[0];
-        }
-    }
-
     function refreshExportHistoryMeta() {
         chrome.storage.local.get(['lastExportAt', 'exportedTweetUrls'], function(data) {
             const n = (data.exportedTweetUrls || []).length;
@@ -137,7 +114,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
 
                         if (response && response.success) {
-                            handleExportSuccess(response.data, {incrementalOnly: incrementalOnly});
+                            handleExportSuccess(response.data, {incrementalOnly: incrementalOnly}).catch(function(err) {
+                                showError(err && err.message ? err.message : 'Export failed.');
+                            });
                         } else {
                             showError(response ? response.error : 'An unknown error occurred');
                         }
@@ -184,7 +163,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    function handleExportSuccess(bookmarks, meta) {
+    async function handleExportSuccess(bookmarks, meta) {
         const incrementalOnly = meta && meta.incrementalOnly;
 
         if (!bookmarks || bookmarks.length === 0) {
@@ -208,7 +187,12 @@ document.addEventListener('DOMContentLoaded', function() {
         progressText.textContent = 'Creating ZIP file...';
         updateProgress(80);
 
-        createAndDownloadZip(markdownFiles, !!incrementalOnly);
+        try {
+            await createAndDownloadZip(markdownFiles, !!incrementalOnly);
+        } catch (err) {
+            showError(err && err.message ? err.message : 'Failed to create or download ZIP.');
+            return;
+        }
 
         progressText.textContent = 'Complete!';
         updateProgress(100);
@@ -277,17 +261,38 @@ document.addEventListener('DOMContentLoaded', function() {
         const indexContent = generateIndexFile(files, isIncremental);
         zip.file('index.md', indexContent);
 
-        const zipContent = await zip.generateAsync({type: 'base64'});
+        let blob;
+        try {
+            blob = await zip.generateAsync({type: 'blob'});
+        } catch (err) {
+            throw new Error(err && err.message ? err.message : 'ZIP generation failed.');
+        }
 
-        const url = 'data:application/zip;base64,' + zipContent;
+        const objectUrl = URL.createObjectURL(blob);
         const datePart = new Date().toISOString().split('T')[0];
         const suffix = isIncremental ? '-incremental' : '';
         const filename = 'x-bookmarks-' + datePart + suffix + '.zip';
 
-        chrome.downloads.download({
-            url: url,
-            filename: filename,
-            saveAs: true
+        return new Promise(function(resolve, reject) {
+            chrome.downloads.download({
+                url: objectUrl,
+                filename: filename,
+                saveAs: true
+            }, function(downloadId) {
+                window.setTimeout(function() {
+                    URL.revokeObjectURL(objectUrl);
+                }, 30000);
+
+                if (chrome.runtime.lastError) {
+                    reject(new Error(chrome.runtime.lastError.message));
+                    return;
+                }
+                if (downloadId === undefined) {
+                    reject(new Error('Download did not start (no download id).'));
+                    return;
+                }
+                resolve(downloadId);
+            });
         });
     }
 

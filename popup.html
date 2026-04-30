@@ -22,11 +22,13 @@
                 <label class="field">
                     <span class="field-label">Max bookmarks</span>
                     <input type="number" id="maxBookmarksInput" class="field-input" min="0" step="1" placeholder="0 = all" value="0" title="Stop after this many bookmarks (0 = no limit)">
+                    <p class="field-hint">Full export + a cap only stores those URLs for incremental mode. Use 0 (no cap) once if you want the full list remembered.</p>
                 </label>
                 <label class="field checkbox-field">
                     <input type="checkbox" id="incrementalOnly">
                     <span>Incremental only (new since last export on this device)</span>
                 </label>
+                <p class="field-hint field-hint-tight">With empty history, incremental still loads all visible items once, then remembers their URLs.</p>
                 <p class="meta" id="exportHistoryMeta"></p>
                 <button type="button" id="clearHistoryBtn" class="btn btn-ghost">
                     Clear export history
@@ -52,10 +54,11 @@
         </div>
         
         <div class="footer">
-            <p>v1.1.0</p>
+            <p>v1.1.1</p>
         </div>
     </div>
     
+    <script src="url-utils.js"></script>
     <script src="popup.js"></script>
 </body>
 </html>
