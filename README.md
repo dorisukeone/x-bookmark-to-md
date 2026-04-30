@@ -2,15 +2,15 @@
 
 Chrome extension that exports your **X (Twitter) bookmarks** as individual Markdown files inside a single **ZIP** archive. Everything runs in the browser; bookmarks are read from the page DOM (no X API).
 
-**Current version:** 1.1.2 (Manifest V3)
+**Current version:** 1.1.3 (Manifest V3)
 
 ## Features
 
 - **Export bookmarks** — Opens [https://x.com/i/bookmarks](https://x.com/i/bookmarks), scrolls the timeline, and collects each tweet card.
 - **Markdown** — One `.md` file per bookmark with author, handle, tweet date, canonical URL, text, embedded image URLs, and `t.co` links.
 - **ZIP + index** — Download includes `index.md` linking to every file.
-- **Max bookmarks** — Optional cap (e.g. `200`); stops after that many items so long lists finish sooner. `0` means no limit.
-- **Incremental export** — Remembers exported tweet URLs in `chrome.storage.local` (this Chrome profile only). With *Incremental only* enabled, already-exported URLs are skipped. Full export replaces that history with the URLs in the current ZIP; incremental merges new URLs into history (up to **8000** URLs; oldest entries are dropped when over the cap).
+- **Max bookmarks (slider)** — Presets: unlimited (∞), 50, 100, 200, 500, or 1000+. Stops scrolling after that many new tweets. Only values on the slider are stored in preferences (other numbers from older versions snap to the nearest step).
+- **Incremental export** — Remembers exported tweet URLs in `chrome.storage.local`. **Incremental** mode skips those URLs; **Full** replaces history with the current ZIP’s URLs. Up to **8000** URLs; oldest drop when over the cap.
 - **Clear history** — Removes stored URLs and last-export timestamp from the popup.
 
 ## How to use

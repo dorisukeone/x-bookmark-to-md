@@ -1,5 +1,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     const MAX_STORED_URLS = 8000;
+    /** Slider index → maxBookmarks for content script (0 = unlimited) */
+    const CAP_BY_INDEX = [0, 50, 100, 200, 500, 1000];
 
     const exportBtn = document.getElementById('exportBtn');
     const openBookmarksBtn = document.getElementById('openBookmarksBtn');
@@ -9,52 +11,123 @@ document.addEventListener('DOMContentLoaded', function() {
     const progress = document.getElementById('progress');
     const progressFill = document.getElementById('progressFill');
     const progressText = document.getElementById('progressText');
-    const maxBookmarksInput = document.getElementById('maxBookmarksInput');
-    const incrementalOnlyEl = document.getElementById('incrementalOnly');
-    const historyVisual = document.getElementById('historyVisual');
-    const statUrlNum = document.getElementById('statUrlNum');
-    const statLastNum = document.getElementById('statLastNum');
-    const statLastWrap = document.getElementById('statLastWrap');
+    const capSlider = document.getElementById('capSlider');
+    const capDisplay = document.getElementById('capDisplay');
+    const modeFull = document.getElementById('modeFull');
+    const modeIncremental = document.getElementById('modeIncremental');
+    const historyCard = document.getElementById('historyCard');
+    const statLastDisplay = document.getElementById('statLastDisplay');
+    const statUrlsDisplay = document.getElementById('statUrlsDisplay');
     const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+    const extVersionEl = document.getElementById('extVersion');
+
+    try {
+        var ver = chrome.runtime.getManifest().version;
+        extVersionEl.textContent = 'v' + ver;
+    } catch (e) {
+        extVersionEl.textContent = '';
+    }
+
+    function maxToSliderIndex(max) {
+        var raw = max == null || max === 0 ? 0 : max;
+        if (raw === 0) {
+            return 0;
+        }
+        var best = 1;
+        var bestDiff = Infinity;
+        for (var i = 1; i < CAP_BY_INDEX.length; i++) {
+            var d = Math.abs(CAP_BY_INDEX[i] - raw);
+            if (d < bestDiff) {
+                bestDiff = d;
+                best = i;
+            }
+        }
+        return best;
+    }
+
+    function indexToMax(idx) {
+        var i = Math.max(0, Math.min(5, parseInt(idx, 10) || 0));
+        return CAP_BY_INDEX[i];
+    }
+
+    function updateCapLabel(idx) {
+        var i = parseInt(idx, 10);
+        if (i === 0) {
+            capDisplay.textContent = '\u221e';
+        } else if (i === 5) {
+            capDisplay.textContent = '1000+';
+        } else {
+            capDisplay.textContent = String(CAP_BY_INDEX[i]);
+        }
+        var m = indexToMax(i);
+        capSlider.setAttribute('aria-valuetext', m === 0 ? 'Unlimited' : 'Max ' + m + ' bookmarks');
+    }
+
+    function syncModeUi(incremental) {
+        if (incremental) {
+            modeFull.classList.remove('is-active');
+            modeIncremental.classList.add('is-active');
+            modeFull.setAttribute('aria-checked', 'false');
+            modeIncremental.setAttribute('aria-checked', 'true');
+        } else {
+            modeFull.classList.add('is-active');
+            modeIncremental.classList.remove('is-active');
+            modeFull.setAttribute('aria-checked', 'true');
+            modeIncremental.setAttribute('aria-checked', 'false');
+        }
+    }
+
+    function isIncrementalMode() {
+        return modeIncremental.classList.contains('is-active');
+    }
 
     function refreshExportHistoryMeta() {
         chrome.storage.local.get(['lastExportAt', 'exportedTweetUrls'], function(data) {
-            const n = (data.exportedTweetUrls || []).length;
-            const last = data.lastExportAt;
-            statUrlNum.textContent = n > 0 ? String(n) : '—';
+            var n = (data.exportedTweetUrls || []).length;
+            var last = data.lastExportAt;
             if (!last && n === 0) {
-                statLastNum.textContent = '—';
-                statLastWrap.title = '';
-                historyVisual.classList.add('history-empty');
+                statLastDisplay.textContent = '\u2014';
+                statUrlsDisplay.textContent = '\u2014';
+                historyCard.classList.add('is-empty');
             } else {
-                historyVisual.classList.remove('history-empty');
-                statLastNum.textContent = last
-                    ? new Date(last).toLocaleDateString(undefined, {month: 'short', day: 'numeric'})
-                    : '—';
-                statLastWrap.title = last
-                    ? new Date(last).toLocaleString(undefined, {dateStyle: 'medium', timeStyle: 'short'})
-                    : '';
+                historyCard.classList.remove('is-empty');
+                statLastDisplay.textContent = last
+                    ? new Date(last).toLocaleString(undefined, {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    })
+                    : '\u2014';
+                statUrlsDisplay.textContent = n > 0 ? (n + ' tweet URLs') : '\u2014';
             }
         });
     }
 
     chrome.storage.local.get(['prefMaxBookmarks', 'prefIncrementalOnly'], function(prefs) {
-        if (prefs.prefMaxBookmarks != null) {
-            maxBookmarksInput.value = String(Math.max(0, prefs.prefMaxBookmarks));
-        }
-        if (typeof prefs.prefIncrementalOnly === 'boolean') {
-            incrementalOnlyEl.checked = prefs.prefIncrementalOnly;
-        }
+        var idx = maxToSliderIndex(prefs.prefMaxBookmarks);
+        capSlider.value = String(idx);
+        updateCapLabel(idx);
+        syncModeUi(!!prefs.prefIncrementalOnly);
     });
 
-    maxBookmarksInput.addEventListener('change', function() {
-        const v = Math.max(0, parseInt(maxBookmarksInput.value, 10) || 0);
-        maxBookmarksInput.value = String(v);
-        chrome.storage.local.set({ prefMaxBookmarks: v });
+    capSlider.addEventListener('input', function() {
+        updateCapLabel(capSlider.value);
     });
 
-    incrementalOnlyEl.addEventListener('change', function() {
-        chrome.storage.local.set({ prefIncrementalOnly: incrementalOnlyEl.checked });
+    capSlider.addEventListener('change', function() {
+        chrome.storage.local.set({prefMaxBookmarks: indexToMax(capSlider.value)});
+    });
+
+    modeFull.addEventListener('click', function() {
+        syncModeUi(false);
+        chrome.storage.local.set({prefIncrementalOnly: false});
+    });
+
+    modeIncremental.addEventListener('click', function() {
+        syncModeUi(true);
+        chrome.storage.local.set({prefIncrementalOnly: true});
     });
 
     clearHistoryBtn.addEventListener('click', function() {
@@ -66,12 +139,12 @@ document.addEventListener('DOMContentLoaded', function() {
     refreshExportHistoryMeta();
 
     chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-        const currentTab = tabs[0];
-        const isBookmarkPage = currentTab.url.includes('x.com/i/bookmarks') ||
+        var currentTab = tabs[0];
+        var isBookmarkPage = currentTab.url.includes('x.com/i/bookmarks') ||
             currentTab.url.includes('twitter.com/i/bookmarks');
 
         if (isBookmarkPage) {
-            updateStatus('success', 'Ready');
+            updateStatus('success', 'Ready to export.');
             exportBtn.disabled = false;
             openBookmarksBtn.hidden = true;
         } else {
@@ -89,16 +162,16 @@ document.addEventListener('DOMContentLoaded', function() {
         exportBtn.disabled = true;
         progress.hidden = false;
         updateStatus('processing', 'Connecting…');
-        progressText.textContent = '…';
+        progressText.textContent = '\u2026';
 
-        const maxVal = Math.max(0, parseInt(maxBookmarksInput.value, 10) || 0);
-        const incrementalOnly = incrementalOnlyEl.checked;
+        var maxVal = indexToMax(capSlider.value);
+        var incrementalOnly = isIncrementalMode();
 
         chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-            const tabId = tabs[0].id;
+            var tabId = tabs[0].id;
             chrome.tabs.sendMessage(tabId, {action: 'ping'}, function(response) {
                 if (chrome.runtime.lastError || !response || response.status !== 'ok') {
-                    showError('Failed to connect. Please reload the page and try again.');
+                    showError('Failed to connect. Reload the page and try again.');
                     return;
                 }
 
@@ -106,7 +179,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 updateStatus('processing', 'Working…');
 
                 chrome.storage.local.get(['exportedTweetUrls'], function(data) {
-                    const knownTweetUrls = (data.exportedTweetUrls || [])
+                    var knownTweetUrls = (data.exportedTweetUrls || [])
                         .map(normalizeTweetUrl)
                         .filter(Boolean);
 
@@ -136,20 +209,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function updateStatus(type, text) {
         statusText.textContent = text;
-        status.className = 'status-card status-' + type;
+        status.className = 'status-strip status-' + type;
         statusIcon.className = 'status-glyph glyph-' + type;
     }
 
     function persistExportHistory(bookmarks, incrementalOnly) {
-        const newUrls = bookmarks.map(function(b) {
+        var newUrls = bookmarks.map(function(b) {
             return normalizeTweetUrl(b.url);
         }).filter(Boolean);
 
         chrome.storage.local.get(['exportedTweetUrls'], function(data) {
-            const prev = (data.exportedTweetUrls || [])
+            var prev = (data.exportedTweetUrls || [])
                 .map(normalizeTweetUrl)
                 .filter(Boolean);
-            let merged;
+            var merged;
             if (incrementalOnly) {
                 merged = Array.from(new Set(prev.concat(newUrls)));
             } else {
@@ -168,15 +241,15 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function handleExportSuccess(bookmarks, meta) {
-        const incrementalOnly = meta && meta.incrementalOnly;
+        var incrementalOnly = meta && meta.incrementalOnly;
 
         if (!bookmarks || bookmarks.length === 0) {
             progress.hidden = true;
             exportBtn.disabled = false;
             if (incrementalOnly) {
-                updateStatus('warning', 'Nothing new');
+                updateStatus('warning', 'Nothing new to export.');
             } else {
-                updateStatus('warning', 'No bookmarks found');
+                updateStatus('warning', 'No bookmarks found.');
             }
             return;
         }
@@ -186,7 +259,7 @@ document.addEventListener('DOMContentLoaded', function() {
         progressText.textContent = 'Building files…';
         updateProgress(50);
 
-        const markdownFiles = generateIndividualMarkdownFiles(bookmarks);
+        var markdownFiles = generateIndividualMarkdownFiles(bookmarks);
 
         progressText.textContent = 'ZIP…';
         updateProgress(80);
@@ -200,7 +273,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         progressText.textContent = 'Done';
         updateProgress(100);
-        updateStatus('success', 'Saved · ' + bookmarks.length + ' items');
+        updateStatus('success', 'Exported ' + bookmarks.length + ' bookmarks.');
 
         setTimeout(function() {
             progress.hidden = true;
@@ -209,14 +282,15 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function generateIndividualMarkdownFiles(bookmarks) {
-        const files = [];
+        var files = [];
 
-        bookmarks.forEach(function(bookmark, index) {
-            const username = bookmark.username || 'unknown';
-            const safeUsername = username.replace(/[^a-zA-Z0-9_-]/g, '_');
-            const filename = 'Bookmark @' + safeUsername + '_' + String(index + 1).padStart(3, '0') + '.md';
+        bookmarks.forEach(function(m, index) {
+            var bookmark = m;
+            var username = bookmark.username || 'unknown';
+            var safeUsername = username.replace(/[^a-zA-Z0-9_-]/g, '_');
+            var filename = 'Bookmark @' + safeUsername + '_' + String(index + 1).padStart(3, '0') + '.md';
 
-            let markdown = '# ' + (bookmark.author || 'Unknown') + '\n\n';
+            var markdown = '# ' + (bookmark.author || 'Unknown') + '\n\n';
             markdown += '**Author:** @' + (bookmark.username || 'unknown') + '\n';
             markdown += '**Date:** ' + (bookmark.date || 'Unknown') + '\n';
             markdown += '**URL:** ' + (bookmark.url || 'N/A') + '\n\n';
@@ -256,26 +330,26 @@ document.addEventListener('DOMContentLoaded', function() {
             await loadJSZip();
         }
 
-        const zip = new JSZip();
+        var zip = new JSZip();
 
         files.forEach(function(file) {
             zip.file(file.filename, file.content);
         });
 
-        const indexContent = generateIndexFile(files, isIncremental);
+        var indexContent = generateIndexFile(files, isIncremental);
         zip.file('index.md', indexContent);
 
-        let blob;
+        var blob;
         try {
             blob = await zip.generateAsync({type: 'blob'});
         } catch (err) {
             throw new Error(err && err.message ? err.message : 'ZIP generation failed.');
         }
 
-        const objectUrl = URL.createObjectURL(blob);
-        const datePart = new Date().toISOString().split('T')[0];
-        const suffix = isIncremental ? '-incremental' : '';
-        const filename = 'x-bookmarks-' + datePart + suffix + '.zip';
+        var objectUrl = URL.createObjectURL(blob);
+        var datePart = new Date().toISOString().split('T')[0];
+        var suffix = isIncremental ? '-incremental' : '';
+        var filename = 'x-bookmarks-' + datePart + suffix + '.zip';
 
         return new Promise(function(resolve, reject) {
             chrome.downloads.download({
@@ -301,7 +375,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function generateIndexFile(files, isIncremental) {
-        let index = '# X Bookmark Export\n\n';
+        var index = '# X Bookmark Export\n\n';
         if (isIncremental) {
             index += '*Incremental export (new items vs. local history)*\n\n';
         }
@@ -310,8 +384,8 @@ document.addEventListener('DOMContentLoaded', function() {
         index += '## File List\n\n';
 
         files.forEach(function(file, i) {
-            const m = file.filename.match(/@([^_]+)/);
-            const username = m ? m[1] : 'unknown';
+            var m = file.filename.match(/@([^_]+)/);
+            var username = m ? m[1] : 'unknown';
             index += (i + 1) + '. [' + file.filename + '](./' + file.filename + ') - @' + username + '\n';
         });
 
@@ -320,7 +394,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function loadJSZip() {
         return new Promise(function(resolve, reject) {
-            const script = document.createElement('script');
+            var script = document.createElement('script');
             script.src = 'jszip.min.js';
             script.onload = resolve;
             script.onerror = reject;
