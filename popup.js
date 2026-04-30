@@ -59,8 +59,22 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             capDisplay.textContent = String(CAP_BY_INDEX[i]);
         }
+        var pct = (i / 5) * 100;
+        capDisplay.style.left = pct + '%';
         var m = indexToMax(i);
         capSlider.setAttribute('aria-valuetext', m === 0 ? 'Unlimited' : 'Max ' + m + ' bookmarks');
+    }
+
+    function setProgressIndeterminate(active) {
+        if (active) {
+            progress.classList.add('is-indeterminate');
+            progressFill.style.animation = '';
+            progressFill.style.marginLeft = '';
+        } else {
+            progress.classList.remove('is-indeterminate');
+            progressFill.style.animation = 'none';
+            progressFill.style.marginLeft = '';
+        }
     }
 
     function syncModeUi(incremental) {
@@ -161,6 +175,7 @@ document.addEventListener('DOMContentLoaded', function() {
     exportBtn.addEventListener('click', function() {
         exportBtn.disabled = true;
         progress.hidden = false;
+        setProgressIndeterminate(true);
         updateStatus('processing', 'Connecting…');
         progressText.textContent = '\u2026';
 
@@ -245,6 +260,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (!bookmarks || bookmarks.length === 0) {
             progress.hidden = true;
+            setProgressIndeterminate(false);
             exportBtn.disabled = false;
             if (incrementalOnly) {
                 updateStatus('warning', 'Nothing new to export.');
@@ -256,6 +272,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         persistExportHistory(bookmarks, !!incrementalOnly);
 
+        setProgressIndeterminate(false);
         progressText.textContent = 'Building files…';
         updateProgress(50);
 
@@ -277,6 +294,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         setTimeout(function() {
             progress.hidden = true;
+            setProgressIndeterminate(false);
             exportBtn.disabled = false;
         }, 2000);
     }
@@ -403,11 +421,15 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function updateProgress(percent) {
+        progressFill.style.animation = 'none';
+        progressFill.style.marginLeft = '0';
         progressFill.style.width = percent + '%';
     }
 
     function showError(message) {
         progress.hidden = true;
+        setProgressIndeterminate(false);
+        progressFill.style.width = '0%';
         exportBtn.disabled = false;
         updateStatus('error', message);
     }

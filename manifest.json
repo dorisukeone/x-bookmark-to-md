@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "x-bookmark-to-md",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "description": "Chrome extension to export X bookmarks in Markdown format",
   "permissions": [
     "activeTab",

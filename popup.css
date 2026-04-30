@@ -163,9 +163,6 @@ body {
 }
 
 .card-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
     margin-bottom: 12px;
 }
 
@@ -177,29 +174,30 @@ body {
     color: #8b98a5;
 }
 
-.format-badges {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.badge-ico {
-    display: flex;
-    opacity: 0.95;
-}
-
 .slider-block {
     margin-bottom: 14px;
+    padding: 0 9px;
+}
+
+.slider-value-rail {
+    position: relative;
+    height: 30px;
+    margin-bottom: 6px;
 }
 
 .slider-value {
-    text-align: center;
+    position: absolute;
+    top: 0;
+    left: 0%;
+    transform: translateX(-50%);
     font-size: 22px;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     color: #f7f9f9;
-    margin-bottom: 6px;
     letter-spacing: -0.02em;
+    line-height: 1.15;
+    pointer-events: none;
+    white-space: nowrap;
 }
 
 .cap-range {
@@ -239,7 +237,6 @@ body {
     font-size: 9px;
     font-weight: 600;
     color: #71767b;
-    padding: 0 2px;
 }
 
 .segmented {
@@ -442,7 +439,24 @@ body {
     height: 100%;
     background: linear-gradient(90deg, #34d399, #1d9bf0);
     width: 0%;
+    margin-left: 0;
     transition: width 0.3s ease;
+}
+
+.progress:not(.is-indeterminate) .progress-fill {
+    animation: none;
+}
+
+.progress.is-indeterminate .progress-fill {
+    width: 38%;
+    transition: none;
+    animation: progress-slide 1.15s ease-in-out infinite;
+}
+
+@keyframes progress-slide {
+    0% { margin-left: 0; }
+    50% { margin-left: 62%; }
+    100% { margin-left: 0; }
 }
 
 .progress-msg {
