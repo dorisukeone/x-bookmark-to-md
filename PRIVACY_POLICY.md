@@ -1,49 +1,47 @@
 # Privacy Policy
 
-**Last updated: December 2024**
+**Last updated: April 2026**
 
 ## Overview
 
-X Bookmark to Markdown Exporter ("the Extension") is committed to protecting your privacy. This privacy policy explains how we handle your data.
+x-bookmark-to-md ("the Extension") runs entirely in your browser. This policy describes what data the extension can access and how it is handled.
 
-## Data Collection and Usage
+## Data the extension accesses
 
-### What Data We Access
+On **https://x.com/i/bookmarks** (and the equivalent Twitter domain), when you start an export:
 
-- Tweet content from your X (Twitter) bookmarks page
-- Author information, timestamps, and URLs of bookmarked tweets
-- Images and links contained within bookmarked tweets
+- Text, author, time, and URL of bookmarked tweets visible on the page
+- Image and link URLs shown in those tweets
 
-### How We Use Your Data
+## How data is used
 
-- All data processing occurs locally within your browser
-- Data is used solely to convert your bookmarks into Markdown format
-- No data is transmitted to external servers or third parties
-- No data is stored permanently by the extension
+- Processing is **local** in Chrome (no extension backend receives your bookmarks).
+- The ZIP / Markdown download is saved **only where you choose** on your device.
 
-### Data Storage and Sharing
+## Local storage (`chrome.storage.local`)
 
-- **Local Processing Only**: All operations are performed locally in your browser
-- **No External Transmission**: We do not send any data to external servers
-- **No Third-Party Sharing**: Your data is never shared with third parties
-- **No Permanent Storage**: The extension does not store your data permanently
-- **User-Controlled Export**: Processed data is downloaded as files to your device under your control
+The extension may store **on your device only**:
 
-## Permissions Explanation
+- **Preferences**: Bookmark count cap and “full” vs “incremental” mode.
+- **Incremental export** (optional): Normalized tweet URLs you have already exported, so the extension can skip them next time—**up to 8,000 URLs**. You can clear this from the popup at any time.
 
-- **activeTab**: Required to access the current X bookmarks page
-- **scripting**: Needed to extract bookmark data from the page
-- **downloads**: Used to save the generated Markdown files to your device
-- **Host permissions (x.com, twitter.com)**: Restricts the extension to work only on X/Twitter domains
+Nothing in storage is sent to our servers; we do not operate a collection server for this extension.
 
-## Data Security
+## Permissions (summary)
 
-Since all processing happens locally in your browser and no data is transmitted externally, your bookmark data remains secure and private.
+| Permission | Why |
+|------------|-----|
+| **activeTab** | Talk to the tab that is open when you use the popup (bookmarks page). |
+| **downloads** | Save the generated ZIP file when you export. |
+| **storage** | Save optional preferences and incremental URL list locally, as described above. |
+| **Host access (x.com / twitter.com)** | Run only on X/Twitter where bookmarks appear. |
 
-## Changes to This Policy
+**Note:** Content scripts are declared in the extension manifest; the extension does **not** use the `scripting` API to inject code dynamically.
 
-We may update this privacy policy from time to time. Any changes will be posted in this repository.
+## Changes
+
+We may update this document; the latest version lives in this repository.
 
 ## Contact
 
-If you have any questions about this privacy policy, please open an issue in this repository.
+Questions: open an issue in this repository.

@@ -2,7 +2,7 @@
 
 Chrome extension that exports your **X (Twitter) bookmarks** as individual Markdown files inside a single **ZIP** archive. Scraping runs entirely in the browser from the bookmarks page DOM (no official X API).
 
-**Current version:** 1.1.6 · Manifest V3
+**Current version:** 1.1.7 · Manifest V3
 
 ## Features
 
@@ -78,7 +78,23 @@ chmod +x scripts/package-for-store.sh
 
 - **手動の場合:** プロジェクト**中身**を選んで ZIP 化するか、`cd` してから上記スクリプトと同じファイルだけを `zip` に含めてください。**親フォルダを1段多く入れない**でください。
 
+### プライバシーへの取り組み（権限の理由文・例）
+
+ストアの **[プライバシーへの取り組み]** で、**`storage`** の理由を求められたときの例です（必要に応じて編集してください）。
+
+**日本語（`storage`）:**
+
+> 端末内（Chrome のローカル領域）にのみ保存します。用途は (1) ポップアップの設定（取得件数の上限・フル／増分モード）、(2) 増分エクスポート利用時に、すでに書き出したツイートの URL を覚えておき、次回以降のエクスポートで重複を省くことです（最大 8,000 件まで。ユーザーが拡張のポップアップからいつでも消去可能）。いずれも開発者のサーバーへ送信しません。
+
+**English (`storage`):**
+
+> Stored only on your device via `chrome.storage.local`. Used to save popup settings (export cap and full vs incremental mode) and, if you use incremental export, a list of tweet URLs already exported so duplicates can be skipped (up to 8,000 URLs; you can clear this from the popup). Nothing is sent to the developer’s servers.
+
+v1.1.7 より **`scripting` 権限は削除済み**です（宣言型の content scripts のみ使用）。新しい ZIP を再アップロードすると、`scripting` の説明入力は求められなくなります。
+
 ## Contributing
+
+Issues and pull requests are welcome.
 
 ## License
 
