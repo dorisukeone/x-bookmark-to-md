@@ -344,7 +344,7 @@ body {
     word-break: break-word;
 }
 
-.btn-wand {
+.btn-clear-history {
     position: absolute;
     right: 10px;
     bottom: 10px;
@@ -361,7 +361,7 @@ body {
     transition: color 0.15s, background 0.15s, border-color 0.15s;
 }
 
-.btn-wand:hover {
+.btn-clear-history:hover {
     color: #c4b5fd;
     border-color: rgba(167, 139, 250, 0.4);
     background: rgba(139, 92, 246, 0.15);
