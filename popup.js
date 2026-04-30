@@ -8,9 +8,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const status = document.getElementById('status');
     const statusIcon = document.getElementById('statusIcon');
     const statusText = document.getElementById('statusText');
-    const progress = document.getElementById('progress');
-    const progressFill = document.getElementById('progressFill');
-    const progressText = document.getElementById('progressText');
     const capSlider = document.getElementById('capSlider');
     const capDisplay = document.getElementById('capDisplay');
     const modeFull = document.getElementById('modeFull');
@@ -63,18 +60,6 @@ document.addEventListener('DOMContentLoaded', function() {
         capDisplay.style.left = pct + '%';
         var m = indexToMax(i);
         capSlider.setAttribute('aria-valuetext', m === 0 ? 'Unlimited' : 'Max ' + m + ' bookmarks');
-    }
-
-    function setProgressIndeterminate(active) {
-        if (active) {
-            progress.classList.add('is-indeterminate');
-            progressFill.style.animation = '';
-            progressFill.style.marginLeft = '';
-        } else {
-            progress.classList.remove('is-indeterminate');
-            progressFill.style.animation = 'none';
-            progressFill.style.marginLeft = '';
-        }
     }
 
     function syncModeUi(incremental) {
@@ -174,10 +159,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     exportBtn.addEventListener('click', function() {
         exportBtn.disabled = true;
-        progress.hidden = false;
-        setProgressIndeterminate(true);
         updateStatus('processing', 'Connecting…');
-        progressText.textContent = '\u2026';
 
         var maxVal = indexToMax(capSlider.value);
         var incrementalOnly = isIncrementalMode();
@@ -190,7 +172,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
 
-                progressText.textContent = 'Fetching…';
                 updateStatus('processing', 'Working…');
 
                 chrome.storage.local.get(['exportedTweetUrls'], function(data) {
@@ -259,8 +240,6 @@ document.addEventListener('DOMContentLoaded', function() {
         var incrementalOnly = meta && meta.incrementalOnly;
 
         if (!bookmarks || bookmarks.length === 0) {
-            progress.hidden = true;
-            setProgressIndeterminate(false);
             exportBtn.disabled = false;
             if (incrementalOnly) {
                 updateStatus('warning', 'Nothing new to export.');
@@ -272,14 +251,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
         persistExportHistory(bookmarks, !!incrementalOnly);
 
-        setProgressIndeterminate(false);
-        progressText.textContent = 'Building files…';
-        updateProgress(50);
+        updateStatus('processing', 'Saving…');
 
         var markdownFiles = generateIndividualMarkdownFiles(bookmarks);
-
-        progressText.textContent = 'ZIP…';
-        updateProgress(80);
 
         try {
             await createAndDownloadZip(markdownFiles, !!incrementalOnly);
@@ -288,15 +262,8 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        progressText.textContent = 'Done';
-        updateProgress(100);
         updateStatus('success', 'Exported ' + bookmarks.length + ' bookmarks.');
-
-        setTimeout(function() {
-            progress.hidden = true;
-            setProgressIndeterminate(false);
-            exportBtn.disabled = false;
-        }, 2000);
+        exportBtn.disabled = false;
     }
 
     function generateIndividualMarkdownFiles(bookmarks) {
@@ -420,16 +387,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    function updateProgress(percent) {
-        progressFill.style.animation = 'none';
-        progressFill.style.marginLeft = '0';
-        progressFill.style.width = percent + '%';
-    }
-
     function showError(message) {
-        progress.hidden = true;
-        setProgressIndeterminate(false);
-        progressFill.style.width = '0%';
         exportBtn.disabled = false;
         updateStatus('error', message);
     }
