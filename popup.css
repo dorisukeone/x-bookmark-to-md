@@ -5,251 +5,452 @@
 }
 
 body {
-    width: 380px;
-    min-height: 400px;
+    width: 320px;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: #1F2937;
+    background: #111827;
     color: #F9FAFB;
 }
 
 .container {
     display: flex;
     flex-direction: column;
-    height: 100%;
-    padding: 24px;
+    padding: 16px 16px 12px;
 }
 
+/* —— Header —— */
 .header {
-    margin-bottom: 24px;
+    margin-bottom: 14px;
 }
 
-.description {
-    font-size: 12px;
-    line-height: 1.5;
-    color: #F9FAFB;
-}
-
-.content {
-    flex: 1;
+.brand {
     display: flex;
-    flex-direction: column;
-    gap: 16px;
+    align-items: center;
+    gap: 12px;
 }
 
-.options {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    padding: 12px;
-    background: rgba(0, 0, 0, 0.2);
+.brand-mark {
+    width: 28px;
+    height: 28px;
     border-radius: 8px;
-}
-
-.field {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.field-label {
-    font-size: 11px;
-    font-weight: 600;
-    color: #D1D5DB;
-}
-
-.field-input {
-    padding: 8px 10px;
-    border: 1px solid #4B5563;
-    border-radius: 6px;
-    background: #111827;
-    color: #F9FAFB;
-    font-size: 12px;
-}
-
-.field-input::placeholder {
-    color: #9CA3AF;
-}
-
-.field-input:focus {
-    outline: none;
-    border-color: #2563EB;
-}
-
-.checkbox-field {
-    flex-direction: row;
-    align-items: flex-start;
-    gap: 8px;
-    font-size: 11px;
-    line-height: 1.4;
-    color: #E5E7EB;
-    cursor: pointer;
-}
-
-.checkbox-field input {
-    margin-top: 2px;
+    background: linear-gradient(145deg, #3b82f6, #1d4ed8);
+    box-shadow: 0 2px 10px rgba(37, 99, 235, 0.35);
     flex-shrink: 0;
 }
 
-.meta {
+.tagline {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+}
+
+.tagline-sub {
     font-size: 10px;
-    line-height: 1.4;
     color: #9CA3AF;
+    margin-top: 2px;
+    letter-spacing: 0.02em;
 }
 
-.field-hint-tight {
-    margin-top: -4px;
-    margin-bottom: 2px;
-}
-
-.btn-ghost {
-    background: transparent;
-    color: #9CA3AF;
-    border: 1px solid #4B5563;
-    padding: 6px 12px;
-    font-size: 11px;
-}
-
-.btn-ghost:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.06);
-    color: #F9FAFB;
-    transform: none;
-}
-
-.status {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.status-icon {
-    font-size: 24px;
-}
-
-.status-icon.warning {
-    color: #F59E0B;
-}
-
-.status-icon.success {
-    color: #10B981;
-}
-
-.status-icon.error {
-    color: #e74c3c;
-}
-
-#statusText {
-    font-size: 12px;
-    line-height: 1.4;
-    /* color: #F9FAFB; */ /* これを削除 */
-}
-
-.actions {
+.content {
     display: flex;
     flex-direction: column;
     gap: 12px;
 }
 
-.btn {
-    padding: 8px 20px;
-    border: none;
-    border-radius: 8px;
+/* —— Status —— */
+.status-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.status-glyph {
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.glyph-success {
+    position: relative;
+}
+
+.glyph-success::after {
+    content: '';
+    width: 6px;
+    height: 11px;
+    border: solid #34d399;
+    border-width: 0 2.5px 2.5px 0;
+    transform: rotate(45deg) translate(-1px, -1px);
+}
+
+.glyph-warning {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(251, 191, 36, 0.12);
+    border: 2px solid #fbbf24;
+}
+
+.glyph-warning::after {
+    content: '!';
+    font-size: 14px;
+    font-weight: 800;
+    color: #fbbf24;
+    line-height: 22px;
+    display: block;
+    text-align: center;
+    margin-top: -1px;
+}
+
+.glyph-error::after {
+    content: '×';
+    font-size: 18px;
+    font-weight: 700;
+    color: #f87171;
+    line-height: 1;
+}
+
+.glyph-processing {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid rgba(52, 211, 153, 0.25);
+    border-top-color: #34d399;
+    animation: spin 0.75s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.status-msg {
+    font-size: 12px;
+    line-height: 1.35;
+    color: #E5E7EB;
+}
+
+.status-card.status-success .status-msg { color: #6ee7b7; }
+.status-card.status-warning .status-msg { color: #fcd34d; }
+.status-card.status-error .status-msg { color: #fca5a5; }
+.status-card.status-processing .status-msg { color: #93c5fd; }
+
+/* —— Panel —— */
+.panel {
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.28);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.option-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    margin-bottom: 6px;
+}
+
+.option-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.option-icon.limit {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    border: 2px solid #6b7280;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.option-icon.limit::after {
+    content: '';
+    position: absolute;
+    left: 3px;
+    right: 3px;
+    top: 5px;
+    height: 2px;
+    background: #6b7280;
+    box-shadow: 0 4px 0 #6b7280;
+}
+
+.option-name {
     font-size: 12px;
     font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
+    color: #d1d5db;
+}
+
+.option-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.input-num {
+    width: 56px;
+    padding: 6px 8px;
+    border: 1px solid #4b5563;
+    border-radius: 8px;
+    background: #030712;
+    color: #f9fafb;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
     text-align: center;
 }
 
+.input-num:focus {
+    outline: none;
+    border-color: #2563eb;
+}
+
+.input-num::placeholder {
+    color: #6b7280;
+    font-size: 16px;
+    line-height: 1;
+}
+
+.hint-btn {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 1px solid #4b5563;
+    background: rgba(255, 255, 255, 0.05);
+    color: #9ca3af;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: help;
+    line-height: 1;
+    padding: 0;
+}
+
+.hint-btn:hover {
+    color: #e5e7eb;
+    border-color: #6b7280;
+}
+
+/* —— Toggle —— */
+.toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    padding: 8px 0 10px;
+    position: relative;
+}
+
+.toggle-input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-ui {
+    width: 38px;
+    height: 22px;
+    background: #374151;
+    border-radius: 11px;
+    position: relative;
+    flex-shrink: 0;
+    transition: background 0.2s ease;
+}
+
+.toggle-ui::after {
+    content: '';
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    background: #f9fafb;
+    border-radius: 50%;
+    top: 2px;
+    left: 2px;
+    transition: transform 0.2s ease;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-input:checked + .toggle-ui {
+    background: #2563eb;
+}
+
+.toggle-input:checked + .toggle-ui::after {
+    transform: translateX(16px);
+}
+
+.toggle-input:focus-visible + .toggle-ui {
+    box-shadow: 0 0 0 2px #1f2937, 0 0 0 4px #60a5fa;
+}
+
+.toggle-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: #e5e7eb;
+}
+
+/* —— History stats —— */
+.history-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-top: 8px;
+    margin-top: 4px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.history-row.history-empty .stat {
+    opacity: 0.55;
+}
+
+.stat {
+    flex: 1;
+    min-width: 0;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    text-align: center;
+}
+
+.stat-value {
+    display: block;
+    font-size: 16px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: #f9fafb;
+    line-height: 1.2;
+}
+
+.stat-unit {
+    display: block;
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #9ca3af;
+    margin-top: 2px;
+}
+
+.btn-clear {
+    flex-shrink: 0;
+    width: 38px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    border: 1px solid #4b5563;
+    background: rgba(255, 255, 255, 0.04);
+    color: #9ca3af;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.btn-clear:hover {
+    color: #fca5a5;
+    border-color: #7f1d1d;
+    background: rgba(127, 29, 29, 0.25);
+}
+
+.icon-trash {
+    flex-shrink: 0;
+}
+
+/* —— Actions —— */
+.actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.btn {
+    padding: 10px 16px;
+    border: none;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+}
+
 .btn:disabled {
-    background: #6B7280;
-    color: #1F2937;
-    opacity: 1; /* 非活性時の透明度を削除 */
+    background: #4b5563;
+    color: #9ca3af;
     cursor: not-allowed;
 }
 
 .btn-primary {
-    background: #2563EB;
-    color: #F9FAFB;
+    background: #1d4ed8;
+    color: #f9fafb;
 }
 
 .btn-primary:hover:not(:disabled) {
-    background: #1D4ED8; /* ホバー時の色を調整 */
-    transform: translateY(-1px);
+    background: #1e40af;
 }
 
 .btn-secondary {
-    background: #2563EB;
-    color: #F9FAFB;
+    background: #2563eb;
+    color: #f9fafb;
 }
 
 .btn-secondary:hover:not(:disabled) {
-    background: #1D4ED8;
-    transform: translateY(-1px);
+    background: #1d4ed8;
 }
 
+.actions [hidden] {
+    display: none !important;
+}
+
+/* —— Progress —— */
 .progress {
     text-align: center;
+    padding-top: 4px;
+}
+
+.progress[hidden] {
+    display: none !important;
 }
 
 .progress-bar {
     width: 100%;
-    height: 8px;
-    background: rgba(249, 250, 251, 0.2); /* テキストの白に合わせて調整 */
-    border-radius: 4px;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
     overflow: hidden;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
 }
 
 .progress-fill {
     height: 100%;
-    background: #10B981;
+    background: linear-gradient(90deg, #34d399, #10b981);
     width: 0%;
     transition: width 0.3s ease;
 }
 
-#progressText {
-    font-size: 12px;
-    color: #F9FAFB;
+.progress-msg {
+    font-size: 11px;
+    color: #d1d5db;
 }
 
+/* —— Footer —— */
 .footer {
     text-align: center;
-    margin-top: 24px;
-    opacity: 0.4; /* 視認性を考慮して調整 */
+    margin-top: 14px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.footer p {
-    font-size: 12px;
-    color: #F9FAFB;
+.ver {
+    font-size: 10px;
+    color: #6b7280;
+    letter-spacing: 0.04em;
 }
-
-/* 状態別のスタイル */
-.status-icon.success+#statusText {
-    color: #10B981;
-}
-
-.status-icon.warning+#statusText {
-    color: #F59E0B;
-}
-
-.status-icon.error+#statusText {
-    color: #e74c3c;
-}
-
-/* アニメーション */
-@keyframes pulse {
-    0% {
-        opacity: 1;
-    }
-    50% {
-        opacity: 0.7;
-    }
-    100% {
-        opacity: 1;
-    }
-}
-
-.status-icon.processing {
-    animation: pulse 1.5s infinite;
-}
-

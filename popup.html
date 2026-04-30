@@ -8,58 +8,80 @@
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <p class="description">Export your X bookmarks in Markdown format.</p>
-        </div>
-        
+        <header class="header">
+            <div class="brand">
+                <span class="brand-mark" aria-hidden="true"></span>
+                <div class="brand-text">
+                    <p class="tagline">Bookmarks → Markdown</p>
+                    <p class="tagline-sub">ZIP · local only</p>
+                </div>
+            </div>
+        </header>
+
         <div class="content">
-            <div class="status" id="status">
-                <div class="status-icon warning" id="statusIcon">⚠</div>
-                <p id="statusText">Please open the X bookmarks page</p>
+            <div class="status-card status-warning" id="status">
+                <div class="status-glyph glyph-warning" id="statusIcon" aria-hidden="true"></div>
+                <p class="status-msg" id="statusText">Open bookmarks page</p>
             </div>
-            
-            <div class="options" id="optionsPanel">
-                <label class="field">
-                    <span class="field-label">Max bookmarks</span>
-                    <input type="number" id="maxBookmarksInput" class="field-input" min="0" step="1" placeholder="0 = all" value="0" title="Stop after this many bookmarks (0 = no limit)">
-                    <p class="field-hint">Full export + a cap only stores those URLs for incremental mode. Use 0 (no cap) once if you want the full list remembered.</p>
+
+            <section class="panel" aria-label="Export options">
+                <div class="option-row">
+                    <label class="option-head" for="maxBookmarksInput">
+                        <span class="option-icon limit" aria-hidden="true"></span>
+                        <span class="option-name">Cap</span>
+                    </label>
+                    <div class="option-input-wrap">
+                        <input type="number" id="maxBookmarksInput" class="input-num" min="0" step="1" placeholder="∞" value="0" title="0 = no limit. With a cap, only exported URLs are remembered for incremental mode — run uncapped once to remember the full set.">
+                        <button type="button" class="hint-btn" id="hintCapBtn" title="0 = no limit. If you use a cap on a full export, only those tweets are stored for incremental mode. Use no cap once to sync full history." aria-label="Help: bookmark limit">?</button>
+                    </div>
+                </div>
+
+                <label class="toggle-row" title="Skip tweet URLs you already exported on this Chrome profile. First run still scans the feed once to fill history.">
+                    <input type="checkbox" id="incrementalOnly" class="toggle-input">
+                    <span class="toggle-ui" aria-hidden="true"></span>
+                    <span class="toggle-label">Incremental</span>
                 </label>
-                <label class="field checkbox-field">
-                    <input type="checkbox" id="incrementalOnly">
-                    <span>Incremental only (new since last export on this device)</span>
-                </label>
-                <p class="field-hint field-hint-tight">With empty history, incremental still loads all visible items once, then remembers their URLs.</p>
-                <p class="meta" id="exportHistoryMeta"></p>
-                <button type="button" id="clearHistoryBtn" class="btn btn-ghost">
-                    Clear export history
-                </button>
-            </div>
-            
+
+                <div class="history-row" id="historyVisual">
+                    <div class="stat" title="Tweet URLs stored for incremental skip (this device, max 8000)">
+                        <span class="stat-value" id="statUrlNum">—</span>
+                        <span class="stat-unit">URLs</span>
+                    </div>
+                    <div class="stat" id="statLastWrap" title="">
+                        <span class="stat-value" id="statLastNum">—</span>
+                        <span class="stat-unit">Last</span>
+                    </div>
+                    <button type="button" id="clearHistoryBtn" class="btn-clear" title="Clear stored URLs and last export time" aria-label="Clear history">
+                        <svg class="icon-trash" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14zM10 11v6M14 11v6"/>
+                        </svg>
+                    </button>
+                </div>
+            </section>
+
             <div class="actions">
-                <button id="openBookmarksBtn" class="btn btn-primary">
-                    Open Bookmarks Page
+                <button type="button" id="openBookmarksBtn" class="btn btn-primary">
+                    Open bookmarks
                 </button>
-                
-                <button id="exportBtn" class="btn btn-secondary" disabled>
-                    Export Bookmarks
+                <button type="button" id="exportBtn" class="btn btn-secondary" disabled>
+                    Export
                 </button>
             </div>
-            
-            <div class="progress" id="progress" style="display: none;">
+
+            <div class="progress" id="progress" hidden>
                 <div class="progress-bar">
                     <div class="progress-fill" id="progressFill"></div>
                 </div>
-                <p id="progressText">Processing...</p>
+                <p class="progress-msg" id="progressText">…</p>
             </div>
         </div>
-        
-        <div class="footer">
-            <p>v1.1.1</p>
-        </div>
+
+        <footer class="footer">
+            <span class="ver">v1.1.2</span>
+        </footer>
     </div>
-    
+
     <script src="url-utils.js"></script>
     <script src="popup.js"></script>
 </body>
 </html>
-

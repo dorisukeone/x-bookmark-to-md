@@ -11,22 +11,29 @@ document.addEventListener('DOMContentLoaded', function() {
     const progressText = document.getElementById('progressText');
     const maxBookmarksInput = document.getElementById('maxBookmarksInput');
     const incrementalOnlyEl = document.getElementById('incrementalOnly');
-    const exportHistoryMeta = document.getElementById('exportHistoryMeta');
+    const historyVisual = document.getElementById('historyVisual');
+    const statUrlNum = document.getElementById('statUrlNum');
+    const statLastNum = document.getElementById('statLastNum');
+    const statLastWrap = document.getElementById('statLastWrap');
     const clearHistoryBtn = document.getElementById('clearHistoryBtn');
 
     function refreshExportHistoryMeta() {
         chrome.storage.local.get(['lastExportAt', 'exportedTweetUrls'], function(data) {
             const n = (data.exportedTweetUrls || []).length;
             const last = data.lastExportAt;
+            statUrlNum.textContent = n > 0 ? String(n) : '—';
             if (!last && n === 0) {
-                exportHistoryMeta.textContent = 'No export history on this device yet.';
+                statLastNum.textContent = '—';
+                statLastWrap.title = '';
+                historyVisual.classList.add('history-empty');
             } else {
-                const lastStr = last ? new Date(last).toLocaleString(undefined, {
-                    dateStyle: 'short',
-                    timeStyle: 'short'
-                }) : '—';
-                exportHistoryMeta.textContent =
-                    'Last export: ' + lastStr + ' · ' + n + ' tweet URLs remembered locally';
+                historyVisual.classList.remove('history-empty');
+                statLastNum.textContent = last
+                    ? new Date(last).toLocaleDateString(undefined, {month: 'short', day: 'numeric'})
+                    : '—';
+                statLastWrap.title = last
+                    ? new Date(last).toLocaleString(undefined, {dateStyle: 'medium', timeStyle: 'short'})
+                    : '';
             }
         });
     }
@@ -64,12 +71,13 @@ document.addEventListener('DOMContentLoaded', function() {
             currentTab.url.includes('twitter.com/i/bookmarks');
 
         if (isBookmarkPage) {
-            updateStatus('success', '✓', 'Ready to export');
+            updateStatus('success', 'Ready');
             exportBtn.disabled = false;
-            openBookmarksBtn.style.display = 'none';
+            openBookmarksBtn.hidden = true;
         } else {
-            updateStatus('warning', '⚠', 'Please open the X bookmarks page');
+            updateStatus('warning', 'Open x.com/i/bookmarks');
             exportBtn.disabled = true;
+            openBookmarksBtn.hidden = false;
         }
     });
 
@@ -79,9 +87,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     exportBtn.addEventListener('click', function() {
         exportBtn.disabled = true;
-        progress.style.display = 'block';
-        updateStatus('processing', '⟳', 'Checking connection...');
-        progressText.textContent = 'Communicating with content script...';
+        progress.hidden = false;
+        updateStatus('processing', 'Connecting…');
+        progressText.textContent = '…';
 
         const maxVal = Math.max(0, parseInt(maxBookmarksInput.value, 10) || 0);
         const incrementalOnly = incrementalOnlyEl.checked;
@@ -94,8 +102,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
 
-                progressText.textContent = 'Fetching bookmarks...';
-                updateStatus('processing', '⟳', 'Processing...');
+                progressText.textContent = 'Fetching…';
+                updateStatus('processing', 'Working…');
 
                 chrome.storage.local.get(['exportedTweetUrls'], function(data) {
                     const knownTweetUrls = (data.exportedTweetUrls || [])
@@ -126,14 +134,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    function updateStatus(type, icon, text) {
-        statusIcon.textContent = icon;
+    function updateStatus(type, text) {
         statusText.textContent = text;
-
-        statusIcon.className = 'status-icon';
-        statusIcon.classList.add(type);
-        status.className = 'status';
-        status.classList.add(type);
+        status.className = 'status-card status-' + type;
+        statusIcon.className = 'status-glyph glyph-' + type;
     }
 
     function persistExportHistory(bookmarks, incrementalOnly) {
@@ -167,24 +171,24 @@ document.addEventListener('DOMContentLoaded', function() {
         const incrementalOnly = meta && meta.incrementalOnly;
 
         if (!bookmarks || bookmarks.length === 0) {
-            progress.style.display = 'none';
+            progress.hidden = true;
             exportBtn.disabled = false;
             if (incrementalOnly) {
-                updateStatus('warning', '⚠', 'No new bookmarks since last export.');
+                updateStatus('warning', 'Nothing new');
             } else {
-                updateStatus('warning', '⚠', 'No bookmarks found.');
+                updateStatus('warning', 'No bookmarks found');
             }
             return;
         }
 
         persistExportHistory(bookmarks, !!incrementalOnly);
 
-        progressText.textContent = 'Generating individual Markdown files...';
+        progressText.textContent = 'Building files…';
         updateProgress(50);
 
         const markdownFiles = generateIndividualMarkdownFiles(bookmarks);
 
-        progressText.textContent = 'Creating ZIP file...';
+        progressText.textContent = 'ZIP…';
         updateProgress(80);
 
         try {
@@ -194,12 +198,12 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        progressText.textContent = 'Complete!';
+        progressText.textContent = 'Done';
         updateProgress(100);
-        updateStatus('success', '✓', 'Exported ' + bookmarks.length + ' bookmarks successfully');
+        updateStatus('success', 'Saved · ' + bookmarks.length + ' items');
 
         setTimeout(function() {
-            progress.style.display = 'none';
+            progress.hidden = true;
             exportBtn.disabled = false;
         }, 2000);
     }
@@ -329,8 +333,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function showError(message) {
-        progress.style.display = 'none';
+        progress.hidden = true;
         exportBtn.disabled = false;
-        updateStatus('error', '✗', message);
+        updateStatus('error', message);
     }
 });
