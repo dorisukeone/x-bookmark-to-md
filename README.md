@@ -62,9 +62,23 @@ Details:
 | `background.js` | Service worker (install) |
 | `jszip.min.js` | ZIP generation |
 
-## Contributing
+## Chrome Web Store（パッケージのアップロード）
 
-Issues and pull requests are welcome.
+ストアは **ZIP の直下に `manifest.json` がある**こと必須です。  
+フォルダごと圧縮すると `あなたのフォルダ名/manifest.json` になり **拒否**されます。
+
+- **推奨:** リポジトリルートで次を実行すると、バージョン付きのストア用 ZIP が作られます。
+
+```bash
+chmod +x scripts/package-for-store.sh
+./scripts/package-for-store.sh
+```
+
+生成物: `x-bookmark-to-md-<version>-store.zip`（例: ルートに `manifest.json`、`icons/` など）
+
+- **手動の場合:** プロジェクト**中身**を選んで ZIP 化するか、`cd` してから上記スクリプトと同じファイルだけを `zip` に含めてください。**親フォルダを1段多く入れない**でください。
+
+## Contributing
 
 ## License
 
