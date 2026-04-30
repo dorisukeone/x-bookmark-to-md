@@ -16,7 +16,7 @@
     *   Download or clone this repository.
     *   Open Chrome and navigate to `chrome://extensions/`.
     *   Enable "Developer mode" in the top right corner.
-    *   Click "Load unpacked" and select the `x-bookmark-exporter` directory.
+    *   Click "Load unpacked" and select this repository folder (e.g. `x-bookmark-to-md`).
 
 2.  **Export Your Bookmarks**:
     *   Navigate to your X bookmarks page (`https://x.com/i/bookmarks`).

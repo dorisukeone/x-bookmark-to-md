@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     const exportBtn = document.getElementById('exportBtn');
     const openBookmarksBtn = document.getElementById('openBookmarksBtn');
-    const status = document.getElementById('status'); // この行を追加
+    const status = document.getElementById('status');
     const statusIcon = document.getElementById('statusIcon');
     const statusText = document.getElementById('statusText');
     const progress = document.getElementById('progress');
