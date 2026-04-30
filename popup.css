@@ -5,7 +5,7 @@
 }
 
 body {
-    width: 350px;
+    width: 380px;
     min-height: 400px;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: #1F2937;
@@ -33,7 +33,81 @@ body {
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: 16px;
+}
+
+.options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.field-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #D1D5DB;
+}
+
+.field-input {
+    padding: 8px 10px;
+    border: 1px solid #4B5563;
+    border-radius: 6px;
+    background: #111827;
+    color: #F9FAFB;
+    font-size: 12px;
+}
+
+.field-input::placeholder {
+    color: #9CA3AF;
+}
+
+.field-input:focus {
+    outline: none;
+    border-color: #2563EB;
+}
+
+.checkbox-field {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 11px;
+    line-height: 1.4;
+    color: #E5E7EB;
+    cursor: pointer;
+}
+
+.checkbox-field input {
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+
+.meta {
+    font-size: 10px;
+    line-height: 1.4;
+    color: #9CA3AF;
+}
+
+.btn-ghost {
+    background: transparent;
+    color: #9CA3AF;
+    border: 1px solid #4B5563;
+    padding: 6px 12px;
+    font-size: 11px;
+}
+
+.btn-ghost:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.06);
+    color: #F9FAFB;
+    transform: none;
 }
 
 .status {

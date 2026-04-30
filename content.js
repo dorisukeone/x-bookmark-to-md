@@ -21,8 +21,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             return;
         }
         
-        // ブックマークデータを取得
-        extractBookmarks()
+        const options = {
+            maxBookmarks: request.maxBookmarks > 0 ? request.maxBookmarks : null,
+            incrementalOnly: !!request.incrementalOnly,
+            knownTweetUrls: Array.isArray(request.knownTweetUrls) ? request.knownTweetUrls : []
+        };
+        
+        extractBookmarks(options)
             .then(bookmarks => {
                 console.log(`Found ${bookmarks.length} bookmarks`);
                 sendResponse({
@@ -42,45 +47,59 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 });
 
-async function extractBookmarks() {
-    const bookmarks = new Map(); // 重複を避けるためにMapを使用
+async function extractBookmarks(options = {}) {
+    const maxBookmarks = options.maxBookmarks > 0 ? options.maxBookmarks : null;
+    const knownSet = options.incrementalOnly && options.knownTweetUrls && options.knownTweetUrls.length > 0
+        ? new Set(options.knownTweetUrls.map(normalizeTweetUrl).filter(Boolean))
+        : null;
+
+    const bookmarks = new Map();
     let scrollAttempts = 0;
-    const maxScrollAttempts = 1000; // 最大スクロール回数を増やす
+    const maxScrollAttempts = 1000;
     let stableCount = 0;
 
-    console.log('Starting bookmark extraction...');
+    console.log('Starting bookmark extraction...', { maxBookmarks, incrementalOnly: !!knownSet, knownCount: knownSet?.size || 0 });
 
-    // ページが完全に読み込まれるまで待機
     await waitForPageLoad();
 
     while (scrollAttempts < maxScrollAttempts) {
-        // 現在表示されているブックマークを取得
         const currentBookmarks = extractVisibleBookmarks();
 
-        // 新しいブックマークを追加
         currentBookmarks.forEach(bookmark => {
-            if (bookmark.url && !bookmarks.has(bookmark.url)) {
-                bookmarks.set(bookmark.url, bookmark);
+            if (!bookmark.url) {
+                return;
+            }
+            const key = normalizeTweetUrl(bookmark.url);
+            if (!key) {
+                return;
+            }
+            if (knownSet && knownSet.has(key)) {
+                return;
+            }
+            if (!bookmarks.has(key)) {
+                bookmarks.set(key, { ...bookmark, url: key });
             }
         });
 
         console.log(`Scroll attempt ${scrollAttempts + 1}: Found ${bookmarks.size} total bookmarks`);
 
+        if (maxBookmarks && bookmarks.size >= maxBookmarks) {
+            console.log('Reached max bookmarks limit, stopping...');
+            break;
+        }
+
         const previousBookmarkCount = bookmarks.size;
         const previousHeight = document.body.scrollHeight;
 
-        // ページの最下部までスクロール
         window.scrollTo(0, document.body.scrollHeight);
 
-        // 新しいコンテンツの読み込みを待機
-        await sleep(3000); // 待機時間を延長
+        await sleep(3000);
 
         const newHeight = document.body.scrollHeight;
 
-        // 新しいコンテンツが読み込まれたかチェック
         if (bookmarks.size === previousBookmarkCount && newHeight === previousHeight) {
             stableCount++;
-            if (stableCount >= 10) { // 安定と見なす回数を増やす
+            if (stableCount >= 10) {
                 console.log('No new bookmarks found and page height did not change after 10 attempts, stopping...');
                 break;
             }
@@ -91,8 +110,36 @@ async function extractBookmarks() {
         scrollAttempts++;
     }
 
-    console.log(`Extraction completed. Total bookmarks: ${bookmarks.size}`);
-    return Array.from(bookmarks.values());
+    let result = Array.from(bookmarks.values());
+    if (maxBookmarks && result.length > maxBookmarks) {
+        result = result.slice(0, maxBookmarks);
+    }
+
+    console.log(`Extraction completed. Total bookmarks: ${result.length}`);
+    return result;
+}
+
+function normalizeTweetUrl(url) {
+    if (!url || typeof url !== 'string') {
+        return '';
+    }
+    try {
+        const u = new URL(url, 'https://x.com');
+        u.search = '';
+        u.hash = '';
+        let host = (u.hostname || '').replace(/^www\./, '');
+        if (host === 'twitter.com' || host === 'mobile.twitter.com' || host === 'x.com') {
+            u.hostname = 'x.com';
+        }
+        u.protocol = 'https:';
+        let out = u.href;
+        if (out.endsWith('/')) {
+            out = out.slice(0, -1);
+        }
+        return out;
+    } catch {
+        return url.split('?')[0].split('#')[0];
+    }
 }
 
 function extractVisibleBookmarks() {
@@ -164,7 +211,8 @@ function extractTweetData(tweetElement) {
         const linkElements = tweetElement.querySelectorAll('a[href*="/status/"]');
         if (linkElements.length > 0) {
             const href = linkElements[0].getAttribute('href');
-            bookmark.url = href.startsWith('http') ? href : `https://x.com${href}`;
+            const raw = href.startsWith('http') ? href : `https://x.com${href}`;
+            bookmark.url = normalizeTweetUrl(raw);
         }
         
         // 画像を取得

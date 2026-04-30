@@ -18,6 +18,21 @@
                 <p id="statusText">Please open the X bookmarks page</p>
             </div>
             
+            <div class="options" id="optionsPanel">
+                <label class="field">
+                    <span class="field-label">Max bookmarks</span>
+                    <input type="number" id="maxBookmarksInput" class="field-input" min="0" step="1" placeholder="0 = all" value="0" title="Stop after this many bookmarks (0 = no limit)">
+                </label>
+                <label class="field checkbox-field">
+                    <input type="checkbox" id="incrementalOnly">
+                    <span>Incremental only (new since last export on this device)</span>
+                </label>
+                <p class="meta" id="exportHistoryMeta"></p>
+                <button type="button" id="clearHistoryBtn" class="btn btn-ghost">
+                    Clear export history
+                </button>
+            </div>
+            
             <div class="actions">
                 <button id="openBookmarksBtn" class="btn btn-primary">
                     Open Bookmarks Page
@@ -37,7 +52,7 @@
         </div>
         
         <div class="footer">
-            <p>v1.0.1</p>
+            <p>v1.1.0</p>
         </div>
     </div>
     
