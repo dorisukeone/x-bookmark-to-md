@@ -1,59 +1,70 @@
 # x-bookmark-to-md
 
-Chrome extension that exports your **X (Twitter) bookmarks** as individual Markdown files inside a single **ZIP** archive. Everything runs in the browser; bookmarks are read from the page DOM (no X API).
+Chrome extension that exports your **X (Twitter) bookmarks** as individual Markdown files inside a single **ZIP** archive. Scraping runs entirely in the browser from the bookmarks page DOM (no official X API).
 
-**Current version:** 1.1.6 (Manifest V3)
+**Current version:** 1.1.6 · Manifest V3
 
 ## Features
 
-- **Export bookmarks** — Opens [https://x.com/i/bookmarks](https://x.com/i/bookmarks), scrolls the timeline, and collects each tweet card.
-- **Markdown** — One `.md` file per bookmark with author, handle, tweet date, canonical URL, text, embedded image URLs, and `t.co` links.
-- **ZIP + index** — Download includes `index.md` linking to every file.
-- **Max bookmarks (slider)** — Presets: unlimited (∞), 50, 100, 200, 500, or 1000+. Stops scrolling after that many new tweets. Only values on the slider are stored in preferences (other numbers from older versions snap to the nearest step).
-- **Incremental export** — Remembers exported tweet URLs in `chrome.storage.local`. **Incremental** mode skips those URLs; **Full** replaces history with the current ZIP’s URLs. Up to **8000** URLs; oldest drop when over the cap.
-- **Clear history** — Removes stored URLs and last-export timestamp from the popup.
+- **Export** — On [x.com/i/bookmarks](https://x.com/i/bookmarks), scrolls the timeline and collects each visible tweet card.
+- **Markdown** — One `.md` per bookmark: author, handle, tweet time, canonical status URL, text, image URLs (`pbs.twimg.com`), and `t.co` links.
+- **ZIP + `index.md`** — Each download lists all files in that archive.
+- **Cap slider** — Stops after: **∞**, **50**, **100**, **200**, **500**, or **1000+** tweets (only these steps are stored; older numeric prefs snap to the nearest step).
+- **Full vs Incremental** — See [Incremental mode](#incremental-mode) below.
+- **History** — Last run time and count of remembered URLs; **trash** button clears stored history for this Chrome profile.
+
+## UI
+
+- Popup shows **Export** (slider + **Full All** / **Incremental New**) and a **status strip** (e.g. *Ready*, *Working…*, *Saving…*) — there is **no** separate progress bar or “Fetching…” line.
+- Version in the header comes from `manifest.json`.
+
+## Incremental mode
+
+Incremental uses **tweet status URLs** (normalized via `url-utils.js`: `x.com`, no query string) as the id, **not** “when you bookmarked”.
+
+| | **Full All** | **Incremental New** |
+|---|--------------|---------------------|
+| **Collection** | Gathers tweets up to the cap (or until the feed stops loading). | Same scrolling, but tweets whose URL is already in local history are **skipped** (not added to the ZIP). |
+| **`chrome.storage.local` after success** | **`exportedTweetUrls`** is **replaced** by the URLs in this ZIP only. | New URLs from this run are **merged** into the existing list (deduped). |
+| **Empty history** | N/A | No URLs to skip yet → first successful run behaves like a **full** scan; history is written after at least one bookmark is exported. |
+
+Details:
+
+- **Storage** — `exportedTweetUrls` (max **8000** URLs; excess drops from the oldest side) and `lastExportAt` (ISO string, mainly for display). **This profile only**; not synced across devices.
+- **Full + cap** — Only URLs that made it into that ZIP are remembered. If you need a “complete” skip-list for incremental, run **Full** once with **∞** (or accept a partial list after a capped export).
+- **8000 cap** — Very old URLs may fall off the list and could appear as “new” again in a later incremental run.
+- **Incremental ZIP filename** — `x-bookmarks-YYYY-MM-DD-incremental.zip`; `index.md` notes incremental exports.
 
 ## How to use
 
-1. **Install**
-   - Clone or download this repository.
-   - Open `chrome://extensions/`, turn on **Developer mode**, click **Load unpacked**, and choose the project folder (the one that contains `manifest.json`).
+1. **Install** — Clone or download this repo. In Chrome: `chrome://extensions/` → **Developer mode** → **Load unpacked** → select the folder that contains `manifest.json`.
+2. **Update** — After `git pull`, open `chrome://extensions/` and click **Reload** on this extension.
+3. **Export** — Open `https://x.com/i/bookmarks` (logged in), click the toolbar icon, choose **Full** or **Incremental**, set the cap if needed, then **Export Bookmarks**. When processing finishes, save the ZIP from the download dialog.
 
-2. **Update after pulling changes**
-   - On `chrome://extensions/`, find **x-bookmark-to-md** and click **Reload** (circular arrow).
+## Caveats
 
-3. **Export**
-   - Go to `https://x.com/i/bookmarks` (logged in).
-   - Click the extension icon → **Export Bookmarks**.
-   - Wait for scrolling to finish, then save the ZIP when prompted.
-   - Incremental ZIPs are named like `x-bookmarks-YYYY-MM-DD-incremental.zip`.
+- **DOM dependence** — If X changes markup or `data-testid`s, extraction may need code updates.
+- **Privacy** — Data stays on your machine; the extension does not send bookmarks to a custom backend.
 
-## Important behavior notes
+## ZIP layout
 
-- **Full export + max count** — Only the URLs actually exported are saved for incremental mode. For a complete “known” list, run once with **no** max (or accept that partial exports define partial history).
-- **Incremental, empty history** — The first run behaves like a full collection; URLs are stored after a successful export with at least one bookmark.
-- **DOM reliance** — If X changes markup or `data-testid` attributes, extraction may break until the selectors are updated.
-- **Privacy** — Bookmark text and metadata stay on your machine; the extension does not send them to a backend.
+- `Bookmark @username_001.md`, …
+- `index.md` — links to each file in **that** archive
 
-## ZIP contents example
-
-- `Bookmark @username_001.md` … per bookmark
-- `index.md` … list of all files in that download
-
-## Project layout (main files)
+## Project layout
 
 | File | Role |
 |------|------|
 | `manifest.json` | MV3 manifest, permissions |
-| `popup.html` / `popup.js` / `popup.css` | Toolbar UI, ZIP build, download |
-| `content.js` | Bookmark page scrolling and DOM scraping |
-| `url-utils.js` | Shared tweet URL normalization for deduplication |
-| `background.js` | Service worker (install hook) |
+| `popup.html` / `popup.js` / `popup.css` | Popup UI, ZIP build, download |
+| `content.js` | Bookmarks page scroll + scrape |
+| `url-utils.js` | Shared URL normalization |
+| `background.js` | Service worker (install) |
 | `jszip.min.js` | ZIP generation |
 
 ## Contributing
 
-Contributions are welcome via issues or pull requests.
+Issues and pull requests are welcome.
 
 ## License
 
