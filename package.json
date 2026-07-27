@@ -1,0 +1,17 @@
+{
+  "name": "x-bookmark-to-md-ci",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "validate": "tsx scripts/validate-extension.ts",
+    "typecheck": "tsc --noEmit",
+    "report:daily": "tsx scripts/daily-report/index.ts",
+    "security:issues": "tsx scripts/daily-report/security-issues.ts",
+    "auto-implement": "tsx scripts/daily-report/auto-implement.ts"
+  },
+  "devDependencies": {
+    "@types/node": "26.1.1",
+    "tsx": "4.23.1",
+    "typescript": "7.0.2"
+  }
+}

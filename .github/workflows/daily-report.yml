@@ -1,0 +1,76 @@
+name: Daily improvement cycle
+
+on:
+  schedule:
+    - cron: "0 23 * * *" # 08:00 JST
+  workflow_dispatch:
+
+concurrency:
+  group: daily-improvement-cycle
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  improve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install CI dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Claude Code CLI
+        run: npm install --global @anthropic-ai/claude-code
+
+      - name: Configure automation author
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Synchronize dependency security issues
+        continue-on-error: true
+        run: pnpm security:issues
+
+      - name: Generate daily report and issues
+        run: pnpm report:daily
+
+      - name: Commit daily report data
+        run: |
+          git add reports
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: update daily automation report"
+            git pull --rebase origin main
+            git push
+          fi
+
+      - name: Attempt automated implementation
+        run: pnpm auto-implement
+
+      - name: Commit implementation attempts
+        if: always()
+        run: |
+          git add reports/data/implementation-attempts.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: record automation attempts"
+            git pull --rebase origin main
+            git push
+          fi
