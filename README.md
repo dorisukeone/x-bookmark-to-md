@@ -44,7 +44,7 @@ Details:
 ## Caveats
 
 - **DOM dependence** — If X changes markup or `data-testid`s, extraction may need code updates.
-- **Privacy** — Data stays on your machine; the extension does not send bookmarks to a custom backend.
+- **Privacy** — Data stays on your machine; the extension does not send bookmarks to a custom backend. It does send anonymous, aggregate usage events (install/export counts, no bookmark content) to Google Analytics 4 — see [`PRIVACY_POLICY.md`](PRIVACY_POLICY.md).
 
 ## ZIP layout
 
@@ -60,6 +60,7 @@ Details:
 | `content.js` | Bookmarks page scroll + scrape |
 | `url-utils.js` | Shared URL normalization |
 | `background.js` | Service worker (install) |
+| `analytics.js` / `analytics-config.js` | Anonymous GA4 usage analytics (see [GA4 setup](docs/ga4-setup.md)) |
 | `jszip.min.js` | ZIP generation |
 
 ## Chrome Web Store（パッケージのアップロード）

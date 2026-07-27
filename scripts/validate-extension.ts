@@ -15,16 +15,29 @@ interface Manifest {
   web_accessible_resources?: Array<{ resources?: string[] }>;
 }
 
-const sourceFiles = ["background.js", "content.js", "popup.js", "url-utils.js"] as const;
+const sourceFiles = [
+  "background.js",
+  "content.js",
+  "popup.js",
+  "url-utils.js",
+  "analytics.js",
+  "analytics-config.js",
+] as const;
 const syntaxFiles = [
   "background.js",
   "content.js",
   "popup.js",
   "url-utils.js",
+  "analytics.js",
+  "analytics-config.js",
   "jszip.min.js",
 ] as const;
 const allowedPermissions = new Set(["activeTab", "downloads", "storage"]);
-const allowedHosts = new Set(["https://x.com/*", "https://twitter.com/*"]);
+const allowedHosts = new Set([
+  "https://x.com/*",
+  "https://twitter.com/*",
+  "https://www.google-analytics.com/*",
+]);
 
 function fail(message: string): never {
   throw new Error(message);

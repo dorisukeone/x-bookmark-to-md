@@ -18,6 +18,8 @@ zip -r "$OUT" \
   popup.css \
   popup.js \
   url-utils.js \
+  analytics.js \
+  analytics-config.js \
   jszip.min.js \
   icons \
   PRIVACY_POLICY.md \
@@ -26,3 +28,9 @@ zip -r "$OUT" \
 echo "Created: $OUT"
 echo "First entries (manifest must be at root):"
 unzip -l "$OUT" | head -18
+
+if grep -q "measurementId: ''" analytics-config.js; then
+  echo ""
+  echo "WARNING: analytics-config.js still has an empty measurementId/apiSecret."
+  echo "Usage analytics will be disabled in this package. See docs/ga4-setup.md."
+fi
