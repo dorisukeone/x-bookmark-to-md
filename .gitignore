@@ -1,3 +1,5 @@
 # Store upload artifacts
 x-bookmark-to-md-*-store.zip
+node_modules/
+.env
 .DS_Store

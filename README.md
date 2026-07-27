@@ -96,6 +96,11 @@ v1.1.7 より **`scripting` 権限は削除済み**です（宣言型の content
 
 Issues and pull requests are welcome.
 
+## Automation
+
+日次メトリクス、依存関係監査、改善Issue、自動実装PRの仕組みは
+[自動改善サイクルのドキュメント](docs/automation.md)を参照してください。
+
 ## License
 
 MIT License.
