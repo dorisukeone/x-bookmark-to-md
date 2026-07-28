@@ -59,6 +59,34 @@ self.__ANALYTICS_CONFIG__ = {
 このスクリプトはローカルの `analytics-config.js`(実際の値が入ったもの)を
 そのままZIPに含めます。値が空のままだと警告が表示されます。
 
+## 5. 日次自動改善レポートへの取り込み(任意)
+
+`reports/YYYY-MM-DD.md` に、GA4の匿名利用状況(過去7日のアクティブユーザー数・
+イベント数)を追加で表示できます。これには GA4 Data API 用の**別の**認証情報
+(サービスアカウント)が必要です。Measurement Protocol のAPIシークレットとは
+別物です。
+
+1. [Google Cloud Console](https://console.cloud.google.com/) で、GA4プロパティに
+   紐づけたい任意のプロジェクトを選択(なければ新規作成)
+2. **APIとサービス → ライブラリ** で **Google Analytics Data API** を有効化
+3. **APIとサービス → 認証情報 → 認証情報を作成 → サービスアカウント** で作成
+4. 作成したサービスアカウントの **キー → 鍵を追加 → 新しい鍵を作成(JSON)** で
+   JSON鍵をダウンロード
+5. GA4管理画面 → **プロパティのアクセス管理** → 「+」→
+   サービスアカウントのメールアドレス(`xxx@yyy.iam.gserviceaccount.com`)を
+   **閲覧者** 権限で追加
+6. ダウンロードしたJSON鍵から `client_email` と `private_key` を取り出し、
+   GA4プロパティの数値ID(`GA4_PROPERTY_ID`。管理画面の「プロパティの詳細」に
+   表示される番号。ストリームIDや測定IDとは別物)と合わせて設定:
+   - ローカル: `.env` に `GA4_PROPERTY_ID` / `GA4_SERVICE_ACCOUNT_EMAIL` /
+     `GA4_SERVICE_ACCOUNT_PRIVATE_KEY`(`private_key`の値をそのまま。改行は
+     `\n`のままでも実際の改行でもどちらでも動作します)を設定
+   - CI: リポジトリの **Settings → Secrets and variables → Actions** に同名の
+     Secretを登録
+
+いずれも未設定の場合、この節は自動的に「Not configured」と表示されるだけで、
+他のレポート生成やIssue作成には影響しません。
+
 ## 既知の制約
 
 - **APIシークレットはビルド成果物(配布ZIP)に平文で含まれます。**

@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { collectGa4Metrics, type Ga4Metrics } from "./ga4.js";
 import {
   DATA_DIR,
   DAILY_LABEL,
@@ -35,6 +36,7 @@ export interface Metrics {
     totalJsLines: number;
     jszipVersion: string | null;
   };
+  ga4: Ga4Metrics;
 }
 
 interface RepoResponse {
@@ -76,7 +78,7 @@ function userOpenIssueCount(repositoryName: string): number {
   return issues.filter((issue) => !issue.labels.some((label) => label.name === DAILY_LABEL)).length;
 }
 
-export function collectMetrics(date = todayJst()): Metrics {
+export async function collectMetrics(date = todayJst()): Promise<Metrics> {
   const repositoryName = repository();
   const repo = ghJson<RepoResponse>(`repos/${repositoryName}`);
   const openIssues = userOpenIssueCount(repositoryName);
@@ -95,6 +97,7 @@ export function collectMetrics(date = todayJst()): Metrics {
     latest === null
       ? null
       : Math.floor((Date.now() - new Date(latest.published_at).getTime()) / 86_400_000);
+  const ga4 = await collectGa4Metrics();
 
   return {
     date,
@@ -121,6 +124,7 @@ export function collectMetrics(date = todayJst()): Metrics {
       totalJsLines: Object.values(jsLines).reduce((sum, count) => sum + count, 0),
       jszipVersion: jszip.match(/JSZip v(\d+\.\d+\.\d+)/u)?.[1] ?? null,
     },
+    ga4,
   };
 }
 
@@ -165,6 +169,23 @@ export function deltas(current: Metrics): {
     anomalies.push("Latest GitHub release is at least 180 days old");
   }
   if (!current.extension.jszipVersion) anomalies.push("Vendored JSZip version was not detected");
+
+  if (current.ga4.enabled) {
+    const completed = current.ga4.eventCounts7d.export_completed ?? 0;
+    const errors = current.ga4.eventCounts7d.export_error ?? 0;
+    if (completed + errors >= 5 && errors / (completed + errors) >= 0.2) {
+      anomalies.push("GA4: export error rate over the last 7 days is at least 20%");
+    }
+    const { activeUsers7d, activeUsers7dPrevious } = current.ga4;
+    if (
+      activeUsers7d !== null &&
+      activeUsers7dPrevious !== null &&
+      activeUsers7dPrevious >= 5 &&
+      activeUsers7d <= activeUsers7dPrevious * 0.7
+    ) {
+      anomalies.push("GA4: active users (7d) dropped by at least 30% week-over-week");
+    }
+  }
 
   return { previous, weekAgo, anomalies };
 }
