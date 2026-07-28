@@ -93,6 +93,18 @@ chmod +x scripts/package-for-store.sh
 
 v1.1.7 より **`scripting` 権限は削除済み**です（宣言型の content scripts のみ使用）。新しい ZIP を再アップロードすると、`scripting` の説明入力は求められなくなります。
 
+v1.2.0 で **host permission `https://www.google-analytics.com/*` を追加**しました。ストアの **[プライバシーへの取り組み]** で理由を求められたときの例です。
+
+**日本語（host permission: `www.google-analytics.com`）:**
+
+> 匿名の利用状況（インストール・アップデート・エクスポート実行回数とモード・エラー発生の種類）を GA4 の Measurement Protocol で送信するために使用します。ブックマークの本文・URL・ユーザー名などは一切送信しません。詳細は本リポジトリの `PRIVACY_POLICY.md` を参照してください。
+
+**English (host permission: `www.google-analytics.com`):**
+
+> Used to send anonymous, aggregate usage events (install/update, export run count and mode, error type) to GA4 via the Measurement Protocol. No bookmark text, URLs, or usernames are ever sent. See `PRIVACY_POLICY.md` in this repository for details.
+
+「データ使用状況」の開示では、収集項目として「使用状況に関する分析情報（Analytics）」に該当する旨をチェックし、プライバシーポリシーのURLに `PRIVACY_POLICY.md` を指定してください。
+
 ## Contributing
 
 Issues and pull requests are welcome.
