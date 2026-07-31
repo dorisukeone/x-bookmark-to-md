@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const ZIP_GENERATION_SLOW_MS = 15000;
 
     const exportBtn = document.getElementById('exportBtn');
+    const retryExportBtn = document.getElementById('retryExportBtn');
     const openBookmarksBtn = document.getElementById('openBookmarksBtn');
     const status = document.getElementById('status');
     const statusIcon = document.getElementById('statusIcon');
@@ -185,7 +186,7 @@ document.addEventListener('DOMContentLoaded', function() {
         chrome.tabs.create({url: 'https://x.com/i/bookmarks'});
     });
 
-    exportBtn.addEventListener('click', function() {
+    function startExport() {
         exportBtn.disabled = true;
         updateStatus('processing', 'Connecting…');
 
@@ -196,7 +197,11 @@ document.addEventListener('DOMContentLoaded', function() {
             var tabId = tabs[0].id;
             chrome.tabs.sendMessage(tabId, {action: 'ping'}, function(response) {
                 if (chrome.runtime.lastError || !response || response.status !== 'ok') {
-                    showError('Failed to connect. Reload the page and try again.', 'connection_failed');
+                    if (isReceivingEndMissingError(chrome.runtime.lastError)) {
+                        showError('Could not connect to the page. Please keep the X/Twitter bookmarks page open, reload it, and try again.', 'receiving_end_missing', 'connection');
+                    } else {
+                        showError('Failed to connect. Reload the page and try again.', 'connection_failed', 'connect');
+                    }
                     return;
                 }
 
@@ -214,27 +219,39 @@ document.addEventListener('DOMContentLoaded', function() {
                         knownTweetUrls: incrementalOnly ? knownTweetUrls : []
                     }, function(response) {
                         if (chrome.runtime.lastError) {
-                            showError('An error occurred: ' + chrome.runtime.lastError.message, 'runtime_error');
+                            if (isReceivingEndMissingError(chrome.runtime.lastError)) {
+                                showError('Could not connect to the page. Please keep the X/Twitter bookmarks page open, reload it, and try again.', 'receiving_end_missing', 'connection');
+                            } else {
+                                showError('An error occurred: ' + chrome.runtime.lastError.message, 'runtime_error', 'extract');
+                            }
                             return;
                         }
 
                         if (response && response.success) {
                             handleExportSuccess(response.data, {incrementalOnly: incrementalOnly, cap: maxVal}).catch(function(err) {
-                                showError(err && err.message ? err.message : 'Export failed.', 'zip_failed');
+                                showError(err && err.message ? err.message : 'Export failed.', 'unexpected_failed', (err && err.stage) || 'unknown');
                             });
                         } else {
-                            showError(response ? response.error : 'An unknown error occurred', 'scrape_failed');
+                            showError(response ? response.error : 'An unknown error occurred', 'scrape_failed', 'extract');
                         }
                     });
                 });
             });
         });
-    });
+    }
+
+    exportBtn.addEventListener('click', startExport);
+    if (retryExportBtn) {
+        retryExportBtn.addEventListener('click', startExport);
+    }
 
     function updateStatus(type, text) {
         statusText.textContent = text;
         status.className = 'status-strip status-' + type;
         statusIcon.className = 'status-glyph glyph-' + type;
+        if (retryExportBtn && type !== 'error') {
+            retryExportBtn.hidden = true;
+        }
     }
 
     function persistExportHistory(bookmarks, incrementalOnly) {
@@ -271,15 +288,21 @@ document.addEventListener('DOMContentLoaded', function() {
             exportBtn.disabled = false;
             if (incrementalOnly) {
                 updateStatus('warning', 'Nothing new to export.');
+                if (self.xbmAnalytics) {
+                    self.xbmAnalytics.sendEvent('export_completed', {
+                        mode: 'incremental',
+                        count: 0,
+                        cap: meta && meta.cap ? String(meta.cap) : 'unlimited'
+                    });
+                }
             } else {
-                updateStatus('warning', 'No bookmarks found.');
-            }
-            if (self.xbmAnalytics) {
-                self.xbmAnalytics.sendEvent('export_completed', {
-                    mode: incrementalOnly ? 'incremental' : 'full',
-                    count: 0,
-                    cap: meta && meta.cap ? String(meta.cap) : 'unlimited'
-                });
+                updateStatus('warning', 'No bookmarks found. Please reload the page and try again.');
+                if (self.xbmAnalytics) {
+                    self.xbmAnalytics.sendEvent('export_empty', {
+                        mode: 'full',
+                        cap: meta && meta.cap ? String(meta.cap) : 'unlimited'
+                    });
+                }
             }
             return;
         }
@@ -288,12 +311,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
         updateStatus('processing', 'Saving…');
 
-        var markdownFiles = generateIndividualMarkdownFiles(bookmarks);
+        var markdownFiles;
+        try {
+            markdownFiles = generateIndividualMarkdownFiles(bookmarks);
+        } catch (err) {
+            showError(err && err.message ? err.message : 'Failed to convert bookmarks to Markdown.', 'convert_failed', 'convert');
+            return;
+        }
 
         try {
             await createAndDownloadZip(markdownFiles, !!incrementalOnly);
         } catch (err) {
-            showError(err && err.message ? err.message : 'Failed to create or download ZIP.', (err && err.reasonCode) || 'zip_download_failed');
+            if (err && err.userCanceled) {
+                exportBtn.disabled = false;
+                updateStatus('warning', 'Save canceled.');
+                return;
+            }
+            var stage = (err && err.stage) || 'zip';
+            var reasonCode = (err && err.reasonCode) || 'zip_download_failed';
+            showError(err && err.message ? err.message : 'Failed to create or download ZIP.', reasonCode, stage);
             return;
         }
 
@@ -356,7 +392,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function createAndDownloadZip(files, isIncremental) {
         if (typeof JSZip === 'undefined') {
-            await loadJSZip();
+            try {
+                await loadJSZip();
+            } catch (err) {
+                var loadErr = new Error(err && err.message ? err.message : 'Failed to load ZIP library.');
+                loadErr.stage = 'zip';
+                throw loadErr;
+            }
         }
 
         var zip = new JSZip();
@@ -380,6 +422,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         } catch (err) {
             var zipError = new Error(err && err.message ? err.message : 'ZIP generation failed.');
+            zipError.stage = 'zip';
             zipError.reasonCode = isSlowZip ? 'zip_generation_large' : 'zip_failed';
             throw zipError;
         }
@@ -400,11 +443,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 }, 30000);
 
                 if (chrome.runtime.lastError) {
-                    reject(new Error(chrome.runtime.lastError.message));
+                    var dlErr = new Error(chrome.runtime.lastError.message);
+                    dlErr.stage = 'download';
+                    dlErr.userCanceled = isUserCanceledError(chrome.runtime.lastError);
+                    reject(dlErr);
                     return;
                 }
                 if (downloadId === undefined) {
-                    reject(new Error('Download did not start (no download id).'));
+                    var noIdErr = new Error('Download did not start (no download id).');
+                    noIdErr.stage = 'download';
+                    reject(noIdErr);
                     return;
                 }
                 resolve(downloadId);
@@ -440,19 +488,33 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    function showError(message, reasonCode) {
+    function isReceivingEndMissingError(lastError) {
+        return !!(lastError && lastError.message && lastError.message.indexOf('Receiving end does not exist') !== -1);
+    }
+
+    function isUserCanceledError(lastError) {
+        return !!(lastError && lastError.message && lastError.message.indexOf('USER_CANCELED') !== -1);
+    }
+
+    function showError(message, reasonCode, stage) {
         exportBtn.disabled = false;
         updateStatus('error', message);
+        if (retryExportBtn) {
+            retryExportBtn.hidden = false;
+        }
+        console.error('[X Bookmark to MD] Export failed at stage "' + (stage || 'unknown') + '":', message);
         chrome.storage.local.set({
             lastExportError: {
-                stage: reasonCode || 'unknown',
+                stage: stage || 'unknown',
+                reason: reasonCode || 'unknown',
                 message: message,
                 ts: Date.now()
             }
         });
         if (self.xbmAnalytics) {
             self.xbmAnalytics.sendEvent('export_error', {
-                reason: reasonCode || 'unknown'
+                reason: reasonCode || 'unknown',
+                stage: stage || 'unknown'
             });
         }
     }

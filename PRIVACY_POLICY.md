@@ -33,7 +33,8 @@ The extension sends a small number of anonymous, aggregate usage events to Googl
 
 - `extension_installed` / `extension_updated` — extension version only.
 - `export_completed` — export mode (full/incremental), bookmark count, and cap setting.
-- `export_error` — a fixed error-reason code (e.g. `connection_failed`, `zip_failed`); never the raw error text.
+- `export_empty` — export mode and cap setting, sent when a full export finds zero bookmarks.
+- `export_error` — a fixed error-reason code (e.g. `connection_failed`, `zip_download_failed`) and a fixed export-stage code (e.g. `connect`, `extract`, `convert`, `zip`, `download`); never the raw error text.
 
 These events **never include bookmark text, tweet URLs, usernames, or any page content**. Each browser profile is identified only by a random ID generated locally (`gaClientId` in `chrome.storage.local`), not by your Google account, X account, or IP-linked identity beyond what Google's infrastructure retains for any web request. This is enabled by default and has no opt-out toggle in the UI; you can disable it by removing `analytics-config.js`'s values or blocking `www.google-analytics.com` yourself. See [`docs/ga4-setup.md`](docs/ga4-setup.md) for how this is configured.
 

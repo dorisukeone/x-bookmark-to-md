@@ -1,1 +1,71 @@
-[]
+[
+  {
+    "issue": 4,
+    "attemptedAt": "2026-07-31T00:20:43.253Z",
+    "status": "pr-created",
+    "detail": "Implementation validated and pull request created",
+    "branch": "auto/issue-4",
+    "pullRequest": "https://github.com/dorisukeone/x-bookmark-to-md/pull/9"
+  },
+  {
+    "issue": 12,
+    "attemptedAt": "2026-07-31T00:52:43.694Z",
+    "status": "failed",
+    "detail": "pnpm exited with status 1",
+    "branch": "auto/issue-12"
+  },
+  {
+    "issue": 13,
+    "attemptedAt": "2026-07-31T00:54:28.167Z",
+    "status": "failed",
+    "detail": "pnpm exited with status 1",
+    "branch": "auto/issue-13"
+  },
+  {
+    "issue": 14,
+    "attemptedAt": "2026-07-31T00:56:08.210Z",
+    "status": "failed",
+    "detail": "pnpm exited with status 1",
+    "branch": "auto/issue-14"
+  },
+  {
+    "issue": 12,
+    "attemptedAt": "2026-07-31T01:14:14.650Z",
+    "status": "pr-created",
+    "detail": "Implementation validated and pull request created",
+    "branch": "auto/issue-12",
+    "pullRequest": "https://github.com/dorisukeone/x-bookmark-to-md/pull/20"
+  },
+  {
+    "issue": 17,
+    "attemptedAt": "2026-07-31T01:25:35.180Z",
+    "status": "pr-created",
+    "detail": "Implementation validated and pull request created",
+    "branch": "auto/issue-17",
+    "pullRequest": "https://github.com/dorisukeone/x-bookmark-to-md/pull/26"
+  },
+  {
+    "issue": 19,
+    "attemptedAt": "2026-07-31T02:01:38.462Z",
+    "status": "pr-created",
+    "detail": "Implementation validated and pull request created",
+    "branch": "auto/issue-19",
+    "pullRequest": "https://github.com/dorisukeone/x-bookmark-to-md/pull/27"
+  },
+  {
+    "issue": 13,
+    "attemptedAt": "2026-07-31T02:09:55.466Z",
+    "status": "pr-created",
+    "detail": "Implementation validated and pull request created",
+    "branch": "auto/issue-13",
+    "pullRequest": "https://github.com/dorisukeone/x-bookmark-to-md/pull/28"
+  },
+  {
+    "issue": 14,
+    "attemptedAt": "2026-07-31T02:14:26.107Z",
+    "status": "pr-created",
+    "detail": "Implementation validated and pull request created",
+    "branch": "auto/issue-14",
+    "pullRequest": "https://github.com/dorisukeone/x-bookmark-to-md/pull/29"
+  }
+]
