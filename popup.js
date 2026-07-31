@@ -294,6 +294,11 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             await createAndDownloadZip(markdownFiles, !!incrementalOnly);
         } catch (err) {
+            if (err && err.userCanceled) {
+                exportBtn.disabled = false;
+                updateStatus('warning', 'Save canceled.');
+                return;
+            }
             var stage = (err && err.stage) || 'zip';
             showError(err && err.message ? err.message : 'Failed to create or download ZIP.', 'zip_download_failed', stage);
             return;
@@ -402,6 +407,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (chrome.runtime.lastError) {
                     var dlErr = new Error(chrome.runtime.lastError.message);
                     dlErr.stage = 'download';
+                    dlErr.userCanceled = isUserCanceledError(chrome.runtime.lastError);
                     reject(dlErr);
                     return;
                 }
@@ -446,6 +452,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function isReceivingEndMissingError(lastError) {
         return !!(lastError && lastError.message && lastError.message.indexOf('Receiving end does not exist') !== -1);
+    }
+
+    function isUserCanceledError(lastError) {
+        return !!(lastError && lastError.message && lastError.message.indexOf('USER_CANCELED') !== -1);
     }
 
     function showError(message, reasonCode, stage) {
