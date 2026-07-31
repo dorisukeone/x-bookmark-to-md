@@ -27,7 +27,7 @@ zip -r "$OUT" \
 
 echo "Created: $OUT"
 echo "First entries (manifest must be at root):"
-unzip -l "$OUT" | head -18
+unzip -l "$OUT"
 
 if grep -q "measurementId: ''" analytics-config.js; then
   echo ""
