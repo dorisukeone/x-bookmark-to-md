@@ -150,6 +150,43 @@ body {
 .status-strip.status-error .status-msg { color: #fca5a5; }
 .status-strip.status-processing .status-msg { color: #93c5fd; }
 
+.progress-block {
+    margin-bottom: 12px;
+}
+
+.progress-track {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+    margin-bottom: 6px;
+}
+
+.progress-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 3px;
+    background: linear-gradient(90deg, #1d9bf0 0%, #60a5fa 100%);
+    transition: width 0.2s ease;
+}
+
+.progress-fill.is-indeterminate {
+    width: 35% !important;
+    animation: progress-indeterminate 1.1s ease-in-out infinite;
+}
+
+@keyframes progress-indeterminate {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(285%); }
+}
+
+.progress-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: #8b98a5;
+}
+
 .card {
     border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.08);

@@ -17,6 +17,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const statUrlsDisplay = document.getElementById('statUrlsDisplay');
     const clearHistoryBtn = document.getElementById('clearHistoryBtn');
     const extVersionEl = document.getElementById('extVersion');
+    const progressBlock = document.getElementById('progressBlock');
+    const progressFill = document.getElementById('progressFill');
+    const progressLabel = document.getElementById('progressLabel');
+
+    var activeMaxBookmarks = 0;
 
     try {
         var ver = chrome.runtime.getManifest().version;
@@ -160,9 +165,11 @@ document.addEventListener('DOMContentLoaded', function() {
     exportBtn.addEventListener('click', function() {
         exportBtn.disabled = true;
         updateStatus('processing', 'Connecting…');
+        showProgress(0, 'Connecting…');
 
         var maxVal = indexToMax(capSlider.value);
         var incrementalOnly = isIncrementalMode();
+        activeMaxBookmarks = maxVal;
 
         chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
             var tabId = tabs[0].id;
@@ -173,6 +180,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
 
                 updateStatus('processing', 'Working…');
+                showProgress(activeMaxBookmarks > 0 ? 0 : null, 'Extracting bookmarks…');
 
                 chrome.storage.local.get(['exportedTweetUrls'], function(data) {
                     var knownTweetUrls = (data.exportedTweetUrls || [])
@@ -207,6 +215,46 @@ document.addEventListener('DOMContentLoaded', function() {
         statusText.textContent = text;
         status.className = 'status-strip status-' + type;
         statusIcon.className = 'status-glyph glyph-' + type;
+    }
+
+    function showProgress(percent, label) {
+        if (!progressBlock) {
+            return;
+        }
+        progressBlock.hidden = false;
+        if (percent === null || percent === undefined) {
+            progressFill.classList.add('is-indeterminate');
+            progressFill.style.width = '';
+        } else {
+            progressFill.classList.remove('is-indeterminate');
+            progressFill.style.width = Math.max(0, Math.min(100, percent)) + '%';
+        }
+        progressLabel.textContent = label || '';
+    }
+
+    function hideProgress() {
+        if (!progressBlock) {
+            return;
+        }
+        progressBlock.hidden = true;
+        progressFill.classList.remove('is-indeterminate');
+        progressFill.style.width = '0%';
+        progressLabel.textContent = '';
+    }
+
+    if (chrome.runtime && chrome.runtime.onMessage) {
+        chrome.runtime.onMessage.addListener(function(request) {
+            if (!request || request.action !== 'exportProgress' || request.phase !== 'extracting') {
+                return;
+            }
+            var count = request.count || 0;
+            var label = 'Extracting… ' + count + (count === 1 ? ' bookmark found' : ' bookmarks found');
+            if (activeMaxBookmarks > 0) {
+                showProgress(Math.round((count / activeMaxBookmarks) * 100), label);
+            } else {
+                showProgress(null, label);
+            }
+        });
     }
 
     function persistExportHistory(bookmarks, incrementalOnly) {
@@ -246,31 +294,40 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 updateStatus('warning', 'No bookmarks found.');
             }
+            hideProgress();
             return;
         }
 
         persistExportHistory(bookmarks, !!incrementalOnly);
 
         updateStatus('processing', 'Saving…');
+        showProgress(0, 'Converting to Markdown… 0/' + bookmarks.length);
 
-        var markdownFiles = generateIndividualMarkdownFiles(bookmarks);
+        var markdownFiles = await generateIndividualMarkdownFiles(bookmarks, function(done, total) {
+            showProgress(Math.round((done / total) * 100), 'Converting to Markdown… ' + done + '/' + total);
+        });
 
         try {
-            await createAndDownloadZip(markdownFiles, !!incrementalOnly);
+            showProgress(0, 'Compressing ZIP… 0%');
+            await createAndDownloadZip(markdownFiles, !!incrementalOnly, function(percent) {
+                showProgress(percent, 'Compressing ZIP… ' + percent + '%');
+            });
         } catch (err) {
             showError(err && err.message ? err.message : 'Failed to create or download ZIP.');
             return;
         }
 
         updateStatus('success', 'Exported ' + bookmarks.length + ' bookmarks.');
+        hideProgress();
         exportBtn.disabled = false;
     }
 
-    function generateIndividualMarkdownFiles(bookmarks) {
+    async function generateIndividualMarkdownFiles(bookmarks, onProgress) {
         var files = [];
+        var total = bookmarks.length;
 
-        bookmarks.forEach(function(m, index) {
-            var bookmark = m;
+        for (var index = 0; index < total; index++) {
+            var bookmark = bookmarks[index];
             var username = bookmark.username || 'unknown';
             var safeUsername = username.replace(/[^a-zA-Z0-9_-]/g, '_');
             var filename = 'Bookmark @' + safeUsername + '_' + String(index + 1).padStart(3, '0') + '.md';
@@ -305,12 +362,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 filename: filename,
                 content: markdown
             });
-        });
+
+            if (onProgress && (index % 20 === 0 || index === total - 1)) {
+                onProgress(index + 1, total);
+            }
+            if (index % 20 === 0 && index > 0) {
+                await new Promise(function(resolve) { setTimeout(resolve, 0); });
+            }
+        }
 
         return files;
     }
 
-    async function createAndDownloadZip(files, isIncremental) {
+    async function createAndDownloadZip(files, isIncremental, onZipProgress) {
         if (typeof JSZip === 'undefined') {
             await loadJSZip();
         }
@@ -326,7 +390,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
         var blob;
         try {
-            blob = await zip.generateAsync({type: 'blob'});
+            blob = await zip.generateAsync({type: 'blob'}, function(metadata) {
+                if (onZipProgress) {
+                    onZipProgress(Math.round(metadata.percent));
+                }
+            });
         } catch (err) {
             throw new Error(err && err.message ? err.message : 'ZIP generation failed.');
         }
@@ -390,5 +458,6 @@ document.addEventListener('DOMContentLoaded', function() {
     function showError(message) {
         exportBtn.disabled = false;
         updateStatus('error', message);
+        hideProgress();
     }
 });

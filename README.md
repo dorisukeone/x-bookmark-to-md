@@ -2,7 +2,7 @@
 
 Chrome extension that exports your **X (Twitter) bookmarks** as individual Markdown files inside a single **ZIP** archive. Scraping runs entirely in the browser from the bookmarks page DOM (no official X API).
 
-**Current version:** 1.1.7 · Manifest V3
+**Current version:** 1.1.8 · Manifest V3
 
 ## Features
 

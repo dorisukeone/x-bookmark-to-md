@@ -87,6 +87,7 @@ async function extractBookmarks(options = {}) {
         });
 
         console.log(`Scroll attempt ${scrollAttempts + 1}: Found ${bookmarks.size} total bookmarks`);
+        reportExtractProgress(bookmarks.size);
 
         if (maxBookmarks && bookmarks.size >= maxBookmarks) {
             console.log('Reached max bookmarks limit, stopping...');
@@ -245,6 +246,16 @@ function waitForPageLoad() {
 
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function reportExtractProgress(count) {
+    try {
+        chrome.runtime.sendMessage({action: 'exportProgress', phase: 'extracting', count: count}, () => {
+            void chrome.runtime.lastError;
+        });
+    } catch (e) {
+        // popup may be closed; ignore
+    }
 }
 
 // ページ読み込み完了時の初期化
