@@ -85,11 +85,11 @@ chmod +x scripts/package-for-store.sh
 
 **日本語（`storage`）:**
 
-> 端末内（Chrome のローカル領域）にのみ保存します。用途は (1) ポップアップの設定（取得件数の上限・フル／増分モード）、(2) 増分エクスポート利用時に、すでに書き出したツイートの URL を覚えておき、次回以降のエクスポートで重複を省くことです（最大 8,000 件まで。ユーザーが拡張のポップアップからいつでも消去可能）。いずれも開発者のサーバーへ送信しません。
+> 端末内（Chrome のローカル領域）にのみ保存します。用途は (1) ポップアップの設定（取得件数の上限・フル／増分モード）、(2) 増分エクスポート利用時に、すでに書き出したツイートの URL を覚えておき、次回以降のエクスポートで重複を省くこと（最大 8,000 件まで。ユーザーが拡張のポップアップからいつでも消去可能）、(3) 匿名の利用状況分析用にローカルで生成したランダムな識別子（`gaClientId`）の保持、(4) 直近のエクスポート失敗時に、失敗した段階名と定型の一般化されたエラーメッセージのみをキャッシュし次回ポップアップ表示時に通知すること（ブックマーク本文やURLは含みません。表示後または次回成功時に消去）です。いずれも開発者のサーバーへ送信しません。
 
 **English (`storage`):**
 
-> Stored only on your device via `chrome.storage.local`. Used to save popup settings (export cap and full vs incremental mode) and, if you use incremental export, a list of tweet URLs already exported so duplicates can be skipped (up to 8,000 URLs; you can clear this from the popup). Nothing is sent to the developer’s servers.
+> Stored only on your device via `chrome.storage.local`. Used to save (1) popup settings (export cap and full vs incremental mode), (2) if you use incremental export, a list of tweet URLs already exported so duplicates can be skipped (up to 8,000 URLs; you can clear this from the popup), (3) a random locally-generated identifier (`gaClientId`) for anonymous usage analytics, and (4) a cache of the most recent export failure (stage name and a fixed, generic error message only — never bookmark text or URLs) so it can be shown as a notice next time the popup opens; cleared once shown or after the next successful export. Nothing is sent to the developer's servers.
 
 v1.1.7 より **`scripting` 権限は削除済み**です（宣言型の content scripts のみ使用）。新しい ZIP を再アップロードすると、`scripting` の説明入力は求められなくなります。
 
@@ -97,11 +97,11 @@ v1.2.0 で **host permission `https://www.google-analytics.com/*` を追加**し
 
 **日本語（host permission: `www.google-analytics.com`）:**
 
-> 匿名の利用状況（インストール・アップデート・エクスポート実行回数とモード・エラー発生の種類）を GA4 の Measurement Protocol で送信するために使用します。ブックマークの本文・URL・ユーザー名などは一切送信しません。詳細は本リポジトリの `PRIVACY_POLICY.md` を参照してください。
+> 匿名の利用状況（インストール・アップデート・エクスポート実行回数とモード・エラー発生の種類と発生段階。ポップアップを処理中に閉じた場合も区別可能な値として送信）を GA4 の Measurement Protocol で送信するために使用します。ブックマークの本文・URL・ユーザー名などは一切送信しません。詳細は本リポジトリの `PRIVACY_POLICY.md` を参照してください。
 
 **English (host permission: `www.google-analytics.com`):**
 
-> Used to send anonymous, aggregate usage events (install/update, export run count and mode, error type) to GA4 via the Measurement Protocol. No bookmark text, URLs, or usernames are ever sent. See `PRIVACY_POLICY.md` in this repository for details.
+> Used to send anonymous, aggregate usage events (install/update, export run count and mode, error type and stage — including a distinct value if the popup is closed mid-export) to GA4 via the Measurement Protocol. No bookmark text, URLs, or usernames are ever sent. See `PRIVACY_POLICY.md` in this repository for details.
 
 「データ使用状況」の開示では、収集項目として「使用状況に関する分析情報（Analytics）」に該当する旨をチェックし、プライバシーポリシーのURLに `PRIVACY_POLICY.md` を指定してください。
 

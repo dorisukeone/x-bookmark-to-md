@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last updated: April 2026**
+**Last updated: July 2026**
 
 ## Overview
 
@@ -24,6 +24,8 @@ The extension may store **on your device only**:
 
 - **Preferences**: Bookmark count cap and “full” vs “incremental” mode.
 - **Incremental export** (optional): Normalized tweet URLs you have already exported, so the extension can skip them next time—**up to 8,000 URLs**. You can clear this from the popup at any time.
+- **Analytics client ID**: A random identifier (`gaClientId`) generated locally, used only to de-duplicate the anonymous usage events described below.
+- **Last export failure**: If an export fails, the failure's stage name and a fixed, generic error message (never bookmark text, tweet URLs, or usernames) are cached so a notice can be shown the next time you open the popup. This is cleared once shown or after your next successful export.
 
 Nothing in storage is sent to our servers; we do not operate a collection server for this extension.
 
@@ -34,7 +36,7 @@ The extension sends a small number of anonymous, aggregate usage events to Googl
 - `extension_installed` / `extension_updated` — extension version only.
 - `export_completed` — export mode (full/incremental), bookmark count, and cap setting.
 - `export_empty` — export mode and cap setting, sent when a full export finds zero bookmarks.
-- `export_error` — a fixed error-reason code (e.g. `connection_failed`, `zip_download_failed`) and a fixed export-stage code (e.g. `connect`, `extract`, `convert`, `zip`, `download`); never the raw error text.
+- `export_error` — a fixed error-reason code (e.g. `connection_failed`, `zip_download_failed`, `zip_generation_large`) and a fixed export-stage code (`connect`, `extract`, `convert`, `zip`, `download`, or `popup_closed` if you close the popup before an in-progress export finishes); never the raw error text.
 
 These events **never include bookmark text, tweet URLs, usernames, or any page content**. Each browser profile is identified only by a random ID generated locally (`gaClientId` in `chrome.storage.local`), not by your Google account, X account, or IP-linked identity beyond what Google's infrastructure retains for any web request. This is enabled by default and has no opt-out toggle in the UI; you can disable it by removing `analytics-config.js`'s values or blocking `www.google-analytics.com` yourself. See [`docs/ga4-setup.md`](docs/ga4-setup.md) for how this is configured.
 
