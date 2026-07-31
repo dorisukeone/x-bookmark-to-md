@@ -68,7 +68,7 @@ async function extractBookmarks(options = {}) {
     await waitForPageLoad();
 
     while (scrollAttempts < maxScrollAttempts) {
-        const currentBookmarks = extractVisibleBookmarks();
+        const currentBookmarks = await extractVisibleBookmarks();
 
         currentBookmarks.forEach(bookmark => {
             if (!bookmark.url) {
@@ -124,7 +124,9 @@ async function extractBookmarks(options = {}) {
     return result;
 }
 
-function extractVisibleBookmarks() {
+const EXTRACTION_BATCH_SIZE = 50;
+
+async function extractVisibleBookmarks() {
     const visibleBookmarks = [];
     const tweetSelector = 'article[data-testid="tweet"]';
     const tweets = document.querySelectorAll(tweetSelector);
@@ -134,18 +136,36 @@ function extractVisibleBookmarks() {
         return visibleBookmarks;
     }
 
-    tweets.forEach((tweet, index) => {
-        try {
-            const bookmark = extractTweetData(tweet);
-            if (bookmark && bookmark.url) {
-                visibleBookmarks.push(bookmark);
+    for (let start = 0; start < tweets.length; start += EXTRACTION_BATCH_SIZE) {
+        const end = Math.min(start + EXTRACTION_BATCH_SIZE, tweets.length);
+
+        for (let index = start; index < end; index++) {
+            try {
+                const bookmark = extractTweetData(tweets[index]);
+                if (bookmark && bookmark.url) {
+                    visibleBookmarks.push(bookmark);
+                }
+            } catch (error) {
+                console.error(`Error extracting tweet ${index}:`, error);
             }
-        } catch (error) {
-            console.error(`Error extracting tweet ${index}:`, error);
         }
-    });
+
+        if (end < tweets.length) {
+            await yieldToMainThread();
+        }
+    }
 
     return visibleBookmarks;
+}
+
+function yieldToMainThread() {
+    return new Promise(resolve => {
+        if (typeof requestIdleCallback === 'function') {
+            requestIdleCallback(() => resolve(), {timeout: 200});
+        } else {
+            setTimeout(resolve, 0);
+        }
+    });
 }
 
 function extractTweetData(tweetElement) {

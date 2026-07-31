@@ -170,6 +170,22 @@ body {
     opacity: 1;
 }
 
+.prior-error-banner[hidden] {
+    display: none;
+}
+
+.keep-open-notice {
+    font-size: 11px;
+    font-weight: 500;
+    color: #8b98a5;
+    text-align: center;
+    margin: -4px 0 12px;
+}
+
+.keep-open-notice[hidden] {
+    display: none;
+}
+
 .card {
     border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.08);
