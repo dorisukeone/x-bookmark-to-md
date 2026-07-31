@@ -35,5 +35,13 @@
     "detail": "Implementation validated and pull request created",
     "branch": "auto/issue-12",
     "pullRequest": "https://github.com/dorisukeone/x-bookmark-to-md/pull/20"
+  },
+  {
+    "issue": 17,
+    "attemptedAt": "2026-07-31T01:25:35.180Z",
+    "status": "pr-created",
+    "detail": "Implementation validated and pull request created",
+    "branch": "auto/issue-17",
+    "pullRequest": "https://github.com/dorisukeone/x-bookmark-to-md/pull/26"
   }
 ]
