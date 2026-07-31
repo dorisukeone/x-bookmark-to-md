@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const priorErrorBanner = document.getElementById('priorErrorBanner');
     const priorErrorText = document.getElementById('priorErrorText');
     const dismissPriorErrorBtn = document.getElementById('dismissPriorErrorBtn');
+    const keepOpenNotice = document.getElementById('keepOpenNotice');
     const capSlider = document.getElementById('capSlider');
     const capDisplay = document.getElementById('capDisplay');
     const modeFull = document.getElementById('modeFull');
@@ -24,12 +25,23 @@ document.addEventListener('DOMContentLoaded', function() {
     const clearHistoryBtn = document.getElementById('clearHistoryBtn');
     const extVersionEl = document.getElementById('extVersion');
 
+    var isExporting = false;
+
     try {
         var ver = chrome.runtime.getManifest().version;
         extVersionEl.textContent = 'v' + ver;
     } catch (e) {
         extVersionEl.textContent = '';
     }
+
+    window.addEventListener('pagehide', function() {
+        if (isExporting && self.xbmAnalytics) {
+            self.xbmAnalytics.sendEvent('export_error', {
+                reason: 'popup_closed',
+                stage: 'popup_closed'
+            });
+        }
+    });
 
     function maxToSliderIndex(max) {
         var raw = max == null || max === 0 ? 0 : max;
@@ -187,6 +199,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function startExport() {
+        isExporting = true;
         exportBtn.disabled = true;
         updateStatus('processing', 'Connecting…');
 
@@ -252,6 +265,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (retryExportBtn && type !== 'error') {
             retryExportBtn.hidden = true;
         }
+        if (keepOpenNotice) {
+            keepOpenNotice.hidden = type !== 'processing';
+        }
     }
 
     function persistExportHistory(bookmarks, incrementalOnly) {
@@ -285,6 +301,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var incrementalOnly = meta && meta.incrementalOnly;
 
         if (!bookmarks || bookmarks.length === 0) {
+            isExporting = false;
             exportBtn.disabled = false;
             if (incrementalOnly) {
                 updateStatus('warning', 'Nothing new to export.');
@@ -323,6 +340,7 @@ document.addEventListener('DOMContentLoaded', function() {
             await createAndDownloadZip(markdownFiles, !!incrementalOnly);
         } catch (err) {
             if (err && err.userCanceled) {
+                isExporting = false;
                 exportBtn.disabled = false;
                 updateStatus('warning', 'Save canceled.');
                 return;
@@ -333,6 +351,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
+        isExporting = false;
         updateStatus('success', 'Exported ' + bookmarks.length + ' bookmarks.');
         exportBtn.disabled = false;
         clearPriorExportError();
@@ -497,6 +516,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function showError(message, reasonCode, stage) {
+        isExporting = false;
         exportBtn.disabled = false;
         updateStatus('error', message);
         if (retryExportBtn) {
