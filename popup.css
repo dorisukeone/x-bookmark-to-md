@@ -413,6 +413,17 @@ body {
     box-shadow: none;
 }
 
+.btn-retry {
+    background: rgba(239, 68, 68, 0.12);
+    color: #fca5a5;
+    border: 1px solid rgba(248, 113, 113, 0.35);
+    margin-bottom: 12px;
+}
+
+.btn-retry:hover:not(:disabled) {
+    background: rgba(239, 68, 68, 0.2);
+}
+
 .actions [hidden] {
     display: none !important;
 }
