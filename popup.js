@@ -251,15 +251,21 @@ document.addEventListener('DOMContentLoaded', function() {
             exportBtn.disabled = false;
             if (incrementalOnly) {
                 updateStatus('warning', 'Nothing new to export.');
+                if (self.xbmAnalytics) {
+                    self.xbmAnalytics.sendEvent('export_completed', {
+                        mode: 'incremental',
+                        count: 0,
+                        cap: meta && meta.cap ? String(meta.cap) : 'unlimited'
+                    });
+                }
             } else {
-                updateStatus('warning', 'No bookmarks found.');
-            }
-            if (self.xbmAnalytics) {
-                self.xbmAnalytics.sendEvent('export_completed', {
-                    mode: incrementalOnly ? 'incremental' : 'full',
-                    count: 0,
-                    cap: meta && meta.cap ? String(meta.cap) : 'unlimited'
-                });
+                updateStatus('warning', 'No bookmarks found. Please reload the page and try again.');
+                if (self.xbmAnalytics) {
+                    self.xbmAnalytics.sendEvent('export_empty', {
+                        mode: 'full',
+                        cap: meta && meta.cap ? String(meta.cap) : 'unlimited'
+                    });
+                }
             }
             return;
         }
