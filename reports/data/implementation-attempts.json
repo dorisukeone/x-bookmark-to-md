@@ -1,1 +1,10 @@
-[]
+[
+  {
+    "issue": 4,
+    "attemptedAt": "2026-07-31T00:20:43.253Z",
+    "status": "pr-created",
+    "detail": "Implementation validated and pull request created",
+    "branch": "auto/issue-4",
+    "pullRequest": "https://github.com/dorisukeone/x-bookmark-to-md/pull/9"
+  }
+]
