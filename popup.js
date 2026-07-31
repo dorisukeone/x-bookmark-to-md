@@ -168,7 +168,11 @@ document.addEventListener('DOMContentLoaded', function() {
             var tabId = tabs[0].id;
             chrome.tabs.sendMessage(tabId, {action: 'ping'}, function(response) {
                 if (chrome.runtime.lastError || !response || response.status !== 'ok') {
-                    showError('Failed to connect. Reload the page and try again.', 'connection_failed', 'connect');
+                    if (isReceivingEndMissingError(chrome.runtime.lastError)) {
+                        showError('Could not connect to the page. Please keep the X/Twitter bookmarks page open, reload it, and try again.', 'receiving_end_missing', 'connection');
+                    } else {
+                        showError('Failed to connect. Reload the page and try again.', 'connection_failed', 'connect');
+                    }
                     return;
                 }
 
@@ -186,7 +190,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         knownTweetUrls: incrementalOnly ? knownTweetUrls : []
                     }, function(response) {
                         if (chrome.runtime.lastError) {
-                            showError('An error occurred: ' + chrome.runtime.lastError.message, 'runtime_error', 'extract');
+                            if (isReceivingEndMissingError(chrome.runtime.lastError)) {
+                                showError('Could not connect to the page. Please keep the X/Twitter bookmarks page open, reload it, and try again.', 'receiving_end_missing', 'connection');
+                            } else {
+                                showError('An error occurred: ' + chrome.runtime.lastError.message, 'runtime_error', 'extract');
+                            }
                             return;
                         }
 
@@ -419,6 +427,10 @@ document.addEventListener('DOMContentLoaded', function() {
             script.onerror = reject;
             document.head.appendChild(script);
         });
+    }
+
+    function isReceivingEndMissingError(lastError) {
+        return !!(lastError && lastError.message && lastError.message.indexOf('Receiving end does not exist') !== -1);
     }
 
     function showError(message, reasonCode, stage) {
