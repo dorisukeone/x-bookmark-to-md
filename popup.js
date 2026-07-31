@@ -168,7 +168,7 @@ document.addEventListener('DOMContentLoaded', function() {
             var tabId = tabs[0].id;
             chrome.tabs.sendMessage(tabId, {action: 'ping'}, function(response) {
                 if (chrome.runtime.lastError || !response || response.status !== 'ok') {
-                    showError('Failed to connect. Reload the page and try again.');
+                    showError('Failed to connect. Reload the page and try again.', 'connection_failed');
                     return;
                 }
 
@@ -186,16 +186,16 @@ document.addEventListener('DOMContentLoaded', function() {
                         knownTweetUrls: incrementalOnly ? knownTweetUrls : []
                     }, function(response) {
                         if (chrome.runtime.lastError) {
-                            showError('An error occurred: ' + chrome.runtime.lastError.message);
+                            showError('An error occurred: ' + chrome.runtime.lastError.message, 'runtime_error');
                             return;
                         }
 
                         if (response && response.success) {
-                            handleExportSuccess(response.data, {incrementalOnly: incrementalOnly}).catch(function(err) {
-                                showError(err && err.message ? err.message : 'Export failed.');
+                            handleExportSuccess(response.data, {incrementalOnly: incrementalOnly, cap: maxVal}).catch(function(err) {
+                                showError(err && err.message ? err.message : 'Export failed.', 'zip_failed');
                             });
                         } else {
-                            showError(response ? response.error : 'An unknown error occurred');
+                            showError(response ? response.error : 'An unknown error occurred', 'scrape_failed');
                         }
                     });
                 });
@@ -246,6 +246,13 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 updateStatus('warning', 'No bookmarks found.');
             }
+            if (self.xbmAnalytics) {
+                self.xbmAnalytics.sendEvent('export_completed', {
+                    mode: incrementalOnly ? 'incremental' : 'full',
+                    count: 0,
+                    cap: meta && meta.cap ? String(meta.cap) : 'unlimited'
+                });
+            }
             return;
         }
 
@@ -258,12 +265,20 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             await createAndDownloadZip(markdownFiles, !!incrementalOnly);
         } catch (err) {
-            showError(err && err.message ? err.message : 'Failed to create or download ZIP.');
+            showError(err && err.message ? err.message : 'Failed to create or download ZIP.', 'zip_download_failed');
             return;
         }
 
         updateStatus('success', 'Exported ' + bookmarks.length + ' bookmarks.');
         exportBtn.disabled = false;
+
+        if (self.xbmAnalytics) {
+            self.xbmAnalytics.sendEvent('export_completed', {
+                mode: incrementalOnly ? 'incremental' : 'full',
+                count: bookmarks.length,
+                cap: meta && meta.cap ? String(meta.cap) : 'unlimited'
+            });
+        }
     }
 
     function generateIndividualMarkdownFiles(bookmarks) {
@@ -387,8 +402,13 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    function showError(message) {
+    function showError(message, reasonCode) {
         exportBtn.disabled = false;
         updateStatus('error', message);
+        if (self.xbmAnalytics) {
+            self.xbmAnalytics.sendEvent('export_error', {
+                reason: reasonCode || 'unknown'
+            });
+        }
     }
 });

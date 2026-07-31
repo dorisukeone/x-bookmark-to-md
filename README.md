@@ -44,7 +44,7 @@ Details:
 ## Caveats
 
 - **DOM dependence** — If X changes markup or `data-testid`s, extraction may need code updates.
-- **Privacy** — Data stays on your machine; the extension does not send bookmarks to a custom backend.
+- **Privacy** — Data stays on your machine; the extension does not send bookmarks to a custom backend. It does send anonymous, aggregate usage events (install/export counts, no bookmark content) to Google Analytics 4 — see [`PRIVACY_POLICY.md`](PRIVACY_POLICY.md).
 
 ## ZIP layout
 
@@ -60,6 +60,7 @@ Details:
 | `content.js` | Bookmarks page scroll + scrape |
 | `url-utils.js` | Shared URL normalization |
 | `background.js` | Service worker (install) |
+| `analytics.js` / `analytics-config.js` | Anonymous GA4 usage analytics (see [GA4 setup](docs/ga4-setup.md)) |
 | `jszip.min.js` | ZIP generation |
 
 ## Chrome Web Store（パッケージのアップロード）
@@ -91,6 +92,18 @@ chmod +x scripts/package-for-store.sh
 > Stored only on your device via `chrome.storage.local`. Used to save popup settings (export cap and full vs incremental mode) and, if you use incremental export, a list of tweet URLs already exported so duplicates can be skipped (up to 8,000 URLs; you can clear this from the popup). Nothing is sent to the developer’s servers.
 
 v1.1.7 より **`scripting` 権限は削除済み**です（宣言型の content scripts のみ使用）。新しい ZIP を再アップロードすると、`scripting` の説明入力は求められなくなります。
+
+v1.2.0 で **host permission `https://www.google-analytics.com/*` を追加**しました。ストアの **[プライバシーへの取り組み]** で理由を求められたときの例です。
+
+**日本語（host permission: `www.google-analytics.com`）:**
+
+> 匿名の利用状況（インストール・アップデート・エクスポート実行回数とモード・エラー発生の種類）を GA4 の Measurement Protocol で送信するために使用します。ブックマークの本文・URL・ユーザー名などは一切送信しません。詳細は本リポジトリの `PRIVACY_POLICY.md` を参照してください。
+
+**English (host permission: `www.google-analytics.com`):**
+
+> Used to send anonymous, aggregate usage events (install/update, export run count and mode, error type) to GA4 via the Measurement Protocol. No bookmark text, URLs, or usernames are ever sent. See `PRIVACY_POLICY.md` in this repository for details.
+
+「データ使用状況」の開示では、収集項目として「使用状況に関する分析情報（Analytics）」に該当する旨をチェックし、プライバシーポリシーのURLに `PRIVACY_POLICY.md` を指定してください。
 
 ## Contributing
 

@@ -254,17 +254,31 @@ function renderReport(
 
 ${comparisons.anomalies.map((item) => `- ⚠️ ${item}`).join("\n") || "- None"}
 
+## GA4 (anonymous usage, last 7 days)
+
+${renderGa4Section(metrics.ga4)}
+
 ## Improvement issues
 
 ${created.map((number) => `- Created #${number}`).join("\n") || "- No new non-duplicate proposals"}
 `;
 }
 
+function renderGa4Section(ga4: Metrics["ga4"]): string {
+  if (!ga4.enabled) return "- Not configured (see `docs/ga4-setup.md`)";
+  const usersLine = `- Active users: ${ga4.activeUsers7d ?? "n/a"} (前週 ${difference(ga4.activeUsers7d ?? 0, ga4.activeUsers7dPrevious ?? undefined)})`;
+  const events = Object.entries(ga4.eventCounts7d);
+  const eventsLines = events.length
+    ? events.map(([name, count]) => `- ${name}: ${count}`).join("\n")
+    : "- No events recorded";
+  return `${usersLine}\n${eventsLines}`;
+}
+
 ensureLabel(DAILY_LABEL, "1D76DB", "Automated daily maintenance report");
 ensureLabel(MANUAL_LABEL, "D93F0B", "Requires human review and is excluded from automation");
 
 const date = todayJst();
-const metrics = collectMetrics(date);
+const metrics = await collectMetrics(date);
 saveMetrics(metrics);
 const comparisons = deltas(metrics);
 const existing = listDailyIssues("all");
