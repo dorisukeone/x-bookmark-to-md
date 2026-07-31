@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const CAP_BY_INDEX = [0, 50, 100, 200, 500, 1000];
 
     const exportBtn = document.getElementById('exportBtn');
+    const retryExportBtn = document.getElementById('retryExportBtn');
     const openBookmarksBtn = document.getElementById('openBookmarksBtn');
     const status = document.getElementById('status');
     const statusIcon = document.getElementById('statusIcon');
@@ -157,7 +158,7 @@ document.addEventListener('DOMContentLoaded', function() {
         chrome.tabs.create({url: 'https://x.com/i/bookmarks'});
     });
 
-    exportBtn.addEventListener('click', function() {
+    function startExport() {
         exportBtn.disabled = true;
         updateStatus('processing', 'Connecting…');
 
@@ -209,12 +210,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             });
         });
-    });
+    }
+
+    exportBtn.addEventListener('click', startExport);
+    if (retryExportBtn) {
+        retryExportBtn.addEventListener('click', startExport);
+    }
 
     function updateStatus(type, text) {
         statusText.textContent = text;
         status.className = 'status-strip status-' + type;
         statusIcon.className = 'status-glyph glyph-' + type;
+        if (retryExportBtn && type !== 'error') {
+            retryExportBtn.hidden = true;
+        }
     }
 
     function persistExportHistory(bookmarks, incrementalOnly) {
@@ -436,6 +445,9 @@ document.addEventListener('DOMContentLoaded', function() {
     function showError(message, reasonCode, stage) {
         exportBtn.disabled = false;
         updateStatus('error', message);
+        if (retryExportBtn) {
+            retryExportBtn.hidden = false;
+        }
         console.error('[X Bookmark to MD] Export failed at stage "' + (stage || 'unknown') + '":', message);
         if (self.xbmAnalytics) {
             self.xbmAnalytics.sendEvent('export_error', {
