@@ -2,6 +2,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const MAX_STORED_URLS = 8000;
     /** Slider index → maxBookmarks for content script (0 = unlimited) */
     const CAP_BY_INDEX = [0, 50, 100, 200, 500, 1000];
+    /** generateAsync onUpdate calls after this many ms mark the run as a "large zip" for analytics */
+    const ZIP_GENERATION_SLOW_MS = 15000;
 
     const exportBtn = document.getElementById('exportBtn');
     const retryExportBtn = document.getElementById('retryExportBtn');
@@ -9,6 +11,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const status = document.getElementById('status');
     const statusIcon = document.getElementById('statusIcon');
     const statusText = document.getElementById('statusText');
+    const priorErrorBanner = document.getElementById('priorErrorBanner');
+    const priorErrorText = document.getElementById('priorErrorText');
+    const dismissPriorErrorBtn = document.getElementById('dismissPriorErrorBtn');
     const capSlider = document.getElementById('capSlider');
     const capDisplay = document.getElementById('capDisplay');
     const modeFull = document.getElementById('modeFull');
@@ -104,6 +109,29 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    function clearPriorExportError() {
+        chrome.storage.local.remove(['lastExportError']);
+        if (priorErrorBanner) {
+            priorErrorBanner.hidden = true;
+        }
+    }
+
+    function showPriorExportErrorIfAny() {
+        chrome.storage.local.get(['lastExportError'], function(data) {
+            var info = data.lastExportError;
+            if (info && info.stage && priorErrorBanner && priorErrorText) {
+                priorErrorText.textContent = 'Previous export failed (' + info.stage + '): ' + (info.message || 'Unknown error');
+                priorErrorBanner.hidden = false;
+            }
+        });
+    }
+
+    if (dismissPriorErrorBtn) {
+        dismissPriorErrorBtn.addEventListener('click', clearPriorExportError);
+    }
+
+    showPriorExportErrorIfAny();
 
     chrome.storage.local.get(['prefMaxBookmarks', 'prefIncrementalOnly'], function(prefs) {
         var idx = maxToSliderIndex(prefs.prefMaxBookmarks);
@@ -300,12 +328,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             var stage = (err && err.stage) || 'zip';
-            showError(err && err.message ? err.message : 'Failed to create or download ZIP.', 'zip_download_failed', stage);
+            var reasonCode = (err && err.reasonCode) || 'zip_download_failed';
+            showError(err && err.message ? err.message : 'Failed to create or download ZIP.', reasonCode, stage);
             return;
         }
 
         updateStatus('success', 'Exported ' + bookmarks.length + ' bookmarks.');
         exportBtn.disabled = false;
+        clearPriorExportError();
 
         if (self.xbmAnalytics) {
             self.xbmAnalytics.sendEvent('export_completed', {
@@ -380,13 +410,21 @@ document.addEventListener('DOMContentLoaded', function() {
         var indexContent = generateIndexFile(files, isIncremental);
         zip.file('index.md', indexContent);
 
+        var zipStartedAt = Date.now();
+        var isSlowZip = false;
+
         var blob;
         try {
-            blob = await zip.generateAsync({type: 'blob'});
+            blob = await zip.generateAsync({type: 'blob'}, function onUpdate() {
+                if (!isSlowZip && Date.now() - zipStartedAt > ZIP_GENERATION_SLOW_MS) {
+                    isSlowZip = true;
+                }
+            });
         } catch (err) {
-            var zipErr = new Error(err && err.message ? err.message : 'ZIP generation failed.');
-            zipErr.stage = 'zip';
-            throw zipErr;
+            var zipError = new Error(err && err.message ? err.message : 'ZIP generation failed.');
+            zipError.stage = 'zip';
+            zipError.reasonCode = isSlowZip ? 'zip_generation_large' : 'zip_failed';
+            throw zipError;
         }
 
         var objectUrl = URL.createObjectURL(blob);
@@ -465,6 +503,14 @@ document.addEventListener('DOMContentLoaded', function() {
             retryExportBtn.hidden = false;
         }
         console.error('[X Bookmark to MD] Export failed at stage "' + (stage || 'unknown') + '":', message);
+        chrome.storage.local.set({
+            lastExportError: {
+                stage: stage || 'unknown',
+                reason: reasonCode || 'unknown',
+                message: message,
+                ts: Date.now()
+            }
+        });
         if (self.xbmAnalytics) {
             self.xbmAnalytics.sendEvent('export_error', {
                 reason: reasonCode || 'unknown',

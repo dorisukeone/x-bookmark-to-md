@@ -23,6 +23,12 @@
             <p class="status-msg" id="statusText">Open bookmarks page</p>
         </div>
 
+        <div class="status-strip status-error prior-error-banner" id="priorErrorBanner" hidden>
+            <div class="status-glyph glyph-error" aria-hidden="true"></div>
+            <p class="status-msg" id="priorErrorText"></p>
+            <button type="button" class="btn-dismiss-error" id="dismissPriorErrorBtn" aria-label="Dismiss">&times;</button>
+        </div>
+
         <button type="button" id="retryExportBtn" class="btn btn-retry" hidden>Retry Export</button>
 
         <section class="card card-config" aria-label="Export settings">

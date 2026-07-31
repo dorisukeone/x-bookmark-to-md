@@ -150,6 +150,26 @@ body {
 .status-strip.status-error .status-msg { color: #fca5a5; }
 .status-strip.status-processing .status-msg { color: #93c5fd; }
 
+.prior-error-banner .status-msg {
+    flex: 1;
+}
+
+.btn-dismiss-error {
+    flex-shrink: 0;
+    border: none;
+    background: transparent;
+    color: inherit;
+    font-size: 16px;
+    line-height: 1;
+    padding: 2px 4px;
+    cursor: pointer;
+    opacity: 0.7;
+}
+
+.btn-dismiss-error:hover {
+    opacity: 1;
+}
+
 .card {
     border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.08);
