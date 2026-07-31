@@ -1,0 +1,36 @@
+{
+  "date": "2026-07-31",
+  "collectedAt": "2026-07-31T00:16:59.533Z",
+  "github": {
+    "stars": 6,
+    "openIssues": 0,
+    "forks": 1,
+    "watchers": 0,
+    "latestRelease": null,
+    "latestReleaseAgeDays": null
+  },
+  "extension": {
+    "manifestVersion": 3,
+    "version": "1.1.7",
+    "permissions": [
+      "activeTab",
+      "downloads",
+      "storage"
+    ],
+    "hostPermissions": [
+      "https://twitter.com/*",
+      "https://x.com/*"
+    ],
+    "permissionCount": 5,
+    "xSelectorCount": 9,
+    "jsLines": {
+      "background.js": 4,
+      "content.js": 261,
+      "popup.js": 395,
+      "url-utils.js": 28,
+      "jszip.min.js": 13
+    },
+    "totalJsLines": 701,
+    "jszipVersion": "3.10.1"
+  }
+}
