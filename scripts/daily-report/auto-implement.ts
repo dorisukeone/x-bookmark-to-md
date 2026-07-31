@@ -1,6 +1,7 @@
-import { mkdtempSync, readFileSync, rmSync, symlinkSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
+import puppeteer from "puppeteer-core";
 import {
   DATA_DIR,
   IMPROVEMENT_MARKER,
@@ -104,7 +105,7 @@ function selectorStrings(source: string): Set<string> {
   return values;
 }
 
-function validateSafety(worktree: string, category: string): void {
+function validateSafety(worktree: string, category: string): string[] {
   const changed = run("git", ["diff", "--name-only", "HEAD"], { cwd: worktree })
     .split(/\r?\n/u)
     .filter(Boolean);
@@ -162,6 +163,110 @@ function validateSafety(worktree: string, category: string): void {
   if (userFacing && beforeManifest.version === afterManifest.version) {
     throw new Error(`User-facing ${category} change requires a manifest version bump`);
   }
+  return changed;
+}
+
+const UI_FILES = new Set(["popup.html", "popup.css", "popup.js"]);
+const SCREENSHOT_RELATIVE_PATH_PREFIX = "reports/screenshots/issue-";
+
+function findChromeExecutable(): string | undefined {
+  const candidates = [
+    process.env.PUPPETEER_EXECUTABLE_PATH,
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/google-chrome",
+    "/usr/bin/chromium-browser",
+    "/usr/bin/chromium",
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  ].filter((path): path is string => Boolean(path));
+  return candidates.find((path) => existsSync(path));
+}
+
+// popup.js expects to run inside the extension runtime; stub the chrome.* calls it makes
+// on load so the popup still renders when opened as a plain file:// page for a screenshot.
+function chromeStub(): void {
+  (globalThis as { chrome?: unknown }).chrome = {
+    runtime: { getManifest: () => ({ version: "0.0.0" }), sendMessage() {} },
+    storage: {
+      local: {
+        get: (_keys: unknown, callback: (data: Record<string, unknown>) => void) => callback({}),
+        set: (_items: unknown, callback?: () => void) => callback?.(),
+        remove: (_keys: unknown, callback?: () => void) => callback?.(),
+      },
+    },
+    tabs: {
+      query: (
+        _options: unknown,
+        callback: (tabs: Array<{ id: number; url: string }>) => void,
+      ) => callback([{ id: 1, url: "https://x.com/i/bookmarks" }]),
+      create() {},
+      sendMessage: (
+        _tabId: unknown,
+        _message: unknown,
+        callback?: (response: { status: string }) => void,
+      ) => callback?.({ status: "ok" }),
+    },
+    downloads: { download: (_options: unknown, callback?: (id: number) => void) => callback?.(1) },
+  };
+}
+
+async function captureUiScreenshot(worktree: string, issueNumber: number): Promise<string | null> {
+  const executablePath = findChromeExecutable();
+  if (!executablePath) {
+    console.warn("No Chrome executable found; skipping UI screenshot.");
+    return null;
+  }
+  const relativePath = `${SCREENSHOT_RELATIVE_PATH_PREFIX}${issueNumber}.png`;
+  try {
+    const browser = await puppeteer.launch({ executablePath, headless: true });
+    try {
+      const page = await browser.newPage();
+      await page.setViewport({ width: 400, height: 640 });
+      await page.evaluateOnNewDocument(chromeStub);
+      await page.goto(`file://${resolve(worktree, "popup.html")}`, { waitUntil: "networkidle0" });
+      mkdirSync(resolve(worktree, "reports/screenshots"), { recursive: true });
+      await page.screenshot({ path: resolve(worktree, relativePath) });
+    } finally {
+      await browser.close();
+    }
+    return relativePath;
+  } catch (error) {
+    console.warn(
+      `Screenshot capture failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return null;
+  }
+}
+
+function extractIssueSection(body: string, heading: string): string | undefined {
+  const match = new RegExp(`##\\s*${heading}\\n([\\s\\S]*?)(?=\\n##\\s|$)`, "u").exec(body);
+  return match?.[1]?.trim();
+}
+
+function buildPullRequestBody(options: {
+  issue: { number: number; title: string; body: string };
+  changed: string[];
+  screenshotPath: string | null;
+  branch: string;
+}): string {
+  const { issue, changed, screenshotPath, branch } = options;
+  const evidence = extractIssueSection(issue.body, "根拠");
+  const background = extractIssueSection(issue.body, "背景");
+  const acceptanceCriteria = extractIssueSection(issue.body, "受け入れ条件");
+  const sections = [
+    `Closes #${issue.number}`,
+    `## 変更内容\n${changed.map((file) => `- \`${file}\``).join("\n")}`,
+  ];
+  if (evidence) sections.push(`## 根拠\n${evidence}`);
+  if (background) sections.push(`## 背景\n${background}`);
+  if (acceptanceCriteria) sections.push(`## 受け入れ条件\n${acceptanceCriteria}`);
+  if (screenshotPath) {
+    sections.push(
+      `## スクリーンショット\n![UI](https://raw.githubusercontent.com/${repository()}/${branch}/${screenshotPath})`,
+    );
+  }
+  sections.push("## 検証\n- `pnpm validate` 成功\n- 自動安全チェック(manifest権限不変更・DOM selector保持・外部通信追加なし)通過");
+  sections.push("Human review is required before merge.");
+  return sections.join("\n\n");
 }
 
 const candidates = listDailyIssues("open")
@@ -234,8 +339,14 @@ Hard constraints:
     );
 
     const category = issue.title.match(/^\[([^\u005d]+)\u005d/u)?.[1] ?? "maintenance";
-    validateSafety(worktree, category);
+    const changed = validateSafety(worktree, category);
     runInherited("pnpm", ["validate"], worktree);
+    const screenshotPath = changed.some((file) => UI_FILES.has(file))
+      ? await captureUiScreenshot(worktree, issue.number)
+      : null;
+    // .gitignore's "node_modules/" only matches real directories, not this symlink, so
+    // it must be removed before staging or `git add -A` commits it.
+    unlinkSync(resolve(worktree, "node_modules"));
     runInherited("git", ["add", "-A"], worktree);
     runInherited("git", ["commit", "-m", `${issue.title} (#${issue.number})`], worktree);
     runInherited("git", ["push", "-u", "origin", branch], worktree);
@@ -251,11 +362,7 @@ Hard constraints:
       "--title",
       issue.title,
       "--body",
-      `Closes #${issue.number}
-
-Automated implementation. Validation: \`pnpm validate\`.
-
-Human review is required before merge.`,
+      buildPullRequestBody({ issue, changed, screenshotPath, branch }),
     ], { cwd: worktree });
     appendAttempt({
       issue: issue.number,
