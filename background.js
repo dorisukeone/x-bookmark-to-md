@@ -1,20 +1,12 @@
 importScripts('analytics-config.js', 'analytics.js', 'jszip.min.js');
 
 var ZIP_GENERATION_SLOW_MS = 15000;
-var DOWNLOAD_RETRY_DELAYS_MS = [500, 1500, 4000];
-var TRANSIENT_DOWNLOAD_ERROR_PATTERNS = [
-    'NETWORK_FAILED',
-    'NETWORK_TIMEOUT',
-    'NETWORK_DISCONNECTED',
-    'NETWORK_SERVER_DOWN',
-    'SERVER_FAILED',
-    'SERVER_UNREACHABLE',
-    'SERVER_TIMEOUT'
-];
 
 var exportCancelRequested = false;
 var keepAliveTimer = null;
 var exportRunning = false;
+/** @type {{ buffer: ArrayBuffer, filename: string, resolve: Function, reject: Function, windowId?: number } | null} */
+var pendingDownload = null;
 
 chrome.runtime.onInstalled.addListener((details) => {
     console.log('X Bookmark Exporter installed');
@@ -27,6 +19,18 @@ chrome.runtime.onInstalled.addListener((details) => {
             version: chrome.runtime.getManifest().version
         });
     }
+});
+
+chrome.windows.onRemoved.addListener(function(windowId) {
+    if (!pendingDownload || pendingDownload.windowId !== windowId) {
+        return;
+    }
+    var pending = pendingDownload;
+    pendingDownload = null;
+    var err = new Error('Save canceled.');
+    err.stage = 'download';
+    err.userCanceled = true;
+    pending.reject(err);
 });
 
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
@@ -72,6 +76,47 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         });
         return true;
     }
+
+    // download.html claims the in-memory ZIP produced by the service worker.
+    // MV3 workers cannot reliably use URL.createObjectURL / large data: URLs with
+    // chrome.downloads + saveAs, so a tiny extension page performs the download.
+    if (request.action === 'claimPendingDownload') {
+        if (!pendingDownload) {
+            sendResponse({ok: false});
+            return;
+        }
+        sendResponse({
+            ok: true,
+            buffer: pendingDownload.buffer,
+            filename: pendingDownload.filename
+        });
+        return;
+    }
+
+    if (request.action === 'pendingDownloadResult') {
+        if (!pendingDownload) {
+            sendResponse({ok: true});
+            return;
+        }
+        var pending = pendingDownload;
+        pendingDownload = null;
+        if (request.ok) {
+            pending.resolve(request.downloadId);
+        } else {
+            var err = new Error(request.message || 'Download failed.');
+            err.stage = 'download';
+            err.userCanceled = !!request.userCanceled;
+            if (request.reason && request.reason !== 'USER_CANCELED' && self.xbmAnalytics) {
+                self.xbmAnalytics.sendEvent('export_error', {
+                    reason: 'download_interrupted',
+                    stage: 'download_' + request.reason
+                });
+            }
+            pending.reject(err);
+        }
+        sendResponse({ok: true});
+        return;
+    }
 });
 
 function startKeepAlive() {
@@ -98,12 +143,6 @@ function setExportJob(job) {
     });
 }
 
-function delay(ms) {
-    return new Promise(function(resolve) {
-        setTimeout(resolve, ms);
-    });
-}
-
 function generateIndexFile(files, isIncremental) {
     var index = '# X Bookmark Export\n\n';
     if (isIncremental) {
@@ -122,100 +161,50 @@ function generateIndexFile(files, isIncremental) {
     return index;
 }
 
-function blobToDataUrl(blob) {
+/**
+ * Open a small extension page that can use URL.createObjectURL and show saveAs.
+ * Service-worker chrome.downloads with data: URLs is unreliable (size limits /
+ * missing user-gesture for save dialogs).
+ */
+function openDownloadPage(arrayBuffer, filename) {
     return new Promise(function(resolve, reject) {
-        var reader = new FileReader();
-        reader.onloadend = function() {
-            if (typeof reader.result === 'string') {
-                resolve(reader.result);
-            } else {
-                reject(new Error('Failed to encode ZIP for download.'));
-            }
-        };
-        reader.onerror = function() {
-            reject(new Error('Failed to encode ZIP for download.'));
-        };
-        reader.readAsDataURL(blob);
-    });
-}
-
-function isUserCanceledError(lastError) {
-    return !!(lastError && lastError.message && lastError.message.indexOf('USER_CANCELED') !== -1);
-}
-
-function isTransientDownloadError(lastError) {
-    if (!lastError || !lastError.message) {
-        return false;
-    }
-    return TRANSIENT_DOWNLOAD_ERROR_PATTERNS.some(function(pattern) {
-        return lastError.message.indexOf(pattern) !== -1;
-    });
-}
-
-function watchDownloadInterruption(downloadId) {
-    if (!chrome.downloads.onChanged) {
-        return;
-    }
-    function onChanged(delta) {
-        if (delta.id !== downloadId || !delta.state || delta.state.current !== 'interrupted') {
+        if (pendingDownload) {
+            reject(Object.assign(new Error('Another download is already pending.'), {
+                stage: 'download',
+                reasonCode: 'zip_download_failed'
+            }));
             return;
         }
-        chrome.downloads.onChanged.removeListener(onChanged);
-        var reason = delta.error && delta.error.current ? delta.error.current : 'unknown';
-        if (reason === 'USER_CANCELED') {
-            return;
-        }
-        if (self.xbmAnalytics) {
-            self.xbmAnalytics.sendEvent('export_error', {
-                reason: 'download_interrupted',
-                stage: 'download_' + reason
-            });
-        }
-    }
-    chrome.downloads.onChanged.addListener(onChanged);
-}
 
-function attemptDownload(dataUrl, filename) {
-    return new Promise(function(resolve, reject) {
-        chrome.downloads.download({
-            url: dataUrl,
+        pendingDownload = {
+            buffer: arrayBuffer,
             filename: filename,
-            conflictAction: 'uniquify',
-            saveAs: true
-        }, function(downloadId) {
-            if (chrome.runtime.lastError) {
-                var dlErr = new Error(chrome.runtime.lastError.message);
-                dlErr.stage = 'download';
-                dlErr.userCanceled = isUserCanceledError(chrome.runtime.lastError);
-                dlErr.transient = isTransientDownloadError(chrome.runtime.lastError);
-                reject(dlErr);
+            resolve: resolve,
+            reject: reject
+        };
+
+        chrome.windows.create({
+            url: chrome.runtime.getURL('download.html'),
+            type: 'popup',
+            width: 380,
+            height: 160,
+            focused: true
+        }, function(win) {
+            if (chrome.runtime.lastError || !win) {
+                pendingDownload = null;
+                var openErr = new Error(
+                    chrome.runtime.lastError
+                        ? chrome.runtime.lastError.message
+                        : 'Failed to open download window.'
+                );
+                openErr.stage = 'download';
+                openErr.reasonCode = 'zip_download_failed';
+                reject(openErr);
                 return;
             }
-            if (downloadId === undefined) {
-                var noIdErr = new Error('Download did not start (no download id).');
-                noIdErr.stage = 'download';
-                reject(noIdErr);
-                return;
-            }
-            watchDownloadInterruption(downloadId);
-            resolve(downloadId);
+            pendingDownload.windowId = win.id;
         });
     });
-}
-
-function downloadWithRetry(dataUrl, filename) {
-    var attempt = 0;
-    function tryOnce() {
-        return attemptDownload(dataUrl, filename).catch(function(err) {
-            if (err.transient && attempt < DOWNLOAD_RETRY_DELAYS_MS.length) {
-                var wait = DOWNLOAD_RETRY_DELAYS_MS[attempt];
-                attempt++;
-                return delay(wait).then(tryOnce);
-            }
-            throw err;
-        });
-    }
-    return tryOnce();
 }
 
 async function runZipAndDownload(files, isIncremental) {
@@ -287,12 +276,12 @@ async function runZipAndDownload(files, isIncremental) {
             count: files.length
         });
 
-        var dataUrl = await blobToDataUrl(blob);
+        var buffer = await blob.arrayBuffer();
         var datePart = new Date().toISOString().split('T')[0];
         var suffix = isIncremental ? '-incremental' : '';
         var filename = 'x-bookmarks-' + datePart + suffix + '.zip';
 
-        await downloadWithRetry(dataUrl, filename);
+        await openDownloadPage(buffer, filename);
 
         await setExportJob({
             status: 'success',

@@ -17,6 +17,8 @@ zip -r "$OUT" \
   popup.html \
   popup.css \
   popup.js \
+  download.html \
+  download-page.js \
   url-utils.js \
   analytics.js \
   analytics-config.js \
