@@ -542,6 +542,7 @@ document.addEventListener('DOMContentLoaded', function() {
             chrome.downloads.download({
                 url: objectUrl,
                 filename: filename,
+                conflictAction: 'uniquify',
                 saveAs: true
             }, function(downloadId) {
                 if (chrome.runtime.lastError) {
@@ -558,9 +559,33 @@ document.addEventListener('DOMContentLoaded', function() {
                     reject(noIdErr);
                     return;
                 }
+                watchDownloadInterruption(downloadId);
                 resolve(downloadId);
             });
         });
+    }
+
+    function watchDownloadInterruption(downloadId) {
+        if (!chrome.downloads.onChanged) {
+            return;
+        }
+        function onChanged(delta) {
+            if (delta.id !== downloadId || !delta.state || delta.state.current !== 'interrupted') {
+                return;
+            }
+            chrome.downloads.onChanged.removeListener(onChanged);
+            var reason = delta.error && delta.error.current ? delta.error.current : 'unknown';
+            if (reason === 'USER_CANCELED') {
+                return;
+            }
+            if (self.xbmAnalytics) {
+                self.xbmAnalytics.sendEvent('export_error', {
+                    reason: 'download_interrupted',
+                    stage: 'download_' + reason
+                });
+            }
+        }
+        chrome.downloads.onChanged.addListener(onChanged);
     }
 
     function delay(ms) {
