@@ -4,6 +4,18 @@ document.addEventListener('DOMContentLoaded', function() {
     const CAP_BY_INDEX = [0, 50, 100, 200, 500, 1000];
     /** generateAsync onUpdate calls after this many ms mark the run as a "large zip" for analytics */
     const ZIP_GENERATION_SLOW_MS = 15000;
+    /** Exponential backoff delays (ms) between retries of a transient chrome.downloads.download failure */
+    const DOWNLOAD_RETRY_DELAYS_MS = [500, 1500, 4000];
+    /** chrome.downloads InterruptReason values considered transient and safe to retry */
+    const TRANSIENT_DOWNLOAD_ERROR_PATTERNS = [
+        'NETWORK_FAILED',
+        'NETWORK_TIMEOUT',
+        'NETWORK_DISCONNECTED',
+        'NETWORK_SERVER_DOWN',
+        'SERVER_FAILED',
+        'SERVER_UNREACHABLE',
+        'SERVER_TIMEOUT'
+    ];
 
     const exportBtn = document.getElementById('exportBtn');
     const retryExportBtn = document.getElementById('retryExportBtn');
@@ -451,20 +463,25 @@ document.addEventListener('DOMContentLoaded', function() {
         var suffix = isIncremental ? '-incremental' : '';
         var filename = 'x-bookmarks-' + datePart + suffix + '.zip';
 
+        return downloadWithRetry(objectUrl, filename).finally(function() {
+            window.setTimeout(function() {
+                URL.revokeObjectURL(objectUrl);
+            }, 30000);
+        });
+    }
+
+    function attemptDownload(objectUrl, filename) {
         return new Promise(function(resolve, reject) {
             chrome.downloads.download({
                 url: objectUrl,
                 filename: filename,
                 saveAs: true
             }, function(downloadId) {
-                window.setTimeout(function() {
-                    URL.revokeObjectURL(objectUrl);
-                }, 30000);
-
                 if (chrome.runtime.lastError) {
                     var dlErr = new Error(chrome.runtime.lastError.message);
                     dlErr.stage = 'download';
                     dlErr.userCanceled = isUserCanceledError(chrome.runtime.lastError);
+                    dlErr.transient = isTransientDownloadError(chrome.runtime.lastError);
                     reject(dlErr);
                     return;
                 }
@@ -477,6 +494,27 @@ document.addEventListener('DOMContentLoaded', function() {
                 resolve(downloadId);
             });
         });
+    }
+
+    function delay(ms) {
+        return new Promise(function(resolve) {
+            window.setTimeout(resolve, ms);
+        });
+    }
+
+    function downloadWithRetry(objectUrl, filename) {
+        var attempt = 0;
+        function tryOnce() {
+            return attemptDownload(objectUrl, filename).catch(function(err) {
+                if (err.transient && attempt < DOWNLOAD_RETRY_DELAYS_MS.length) {
+                    var wait = DOWNLOAD_RETRY_DELAYS_MS[attempt];
+                    attempt++;
+                    return delay(wait).then(tryOnce);
+                }
+                throw err;
+            });
+        }
+        return tryOnce();
     }
 
     function generateIndexFile(files, isIncremental) {
@@ -513,6 +551,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function isUserCanceledError(lastError) {
         return !!(lastError && lastError.message && lastError.message.indexOf('USER_CANCELED') !== -1);
+    }
+
+    function isTransientDownloadError(lastError) {
+        if (!lastError || !lastError.message) {
+            return false;
+        }
+        return TRANSIENT_DOWNLOAD_ERROR_PATTERNS.some(function(pattern) {
+            return lastError.message.indexOf(pattern) !== -1;
+        });
     }
 
     function showError(message, reasonCode, stage) {
