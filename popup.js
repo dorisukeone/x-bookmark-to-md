@@ -509,7 +509,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
         var blob;
         try {
-            blob = await zip.generateAsync({type: 'blob'}, function onUpdate() {
+            blob = await zip.generateAsync({
+                type: 'blob',
+                compression: 'DEFLATE',
+                compressionOptions: { level: 1 }
+            }, function onUpdate() {
                 if (!isSlowZip && Date.now() - zipStartedAt > ZIP_GENERATION_SLOW_MS) {
                     isSlowZip = true;
                 }
