@@ -285,7 +285,7 @@ async function runZipAndDownload(files, isIncremental) {
 
         await setExportJob({
             status: 'success',
-            message: 'Exported ' + files.length + ' bookmarks.',
+            message: 'Saved ' + files.length + ' bookmarks to Downloads.',
             ts: Date.now(),
             count: files.length,
             isIncremental: !!isIncremental

@@ -160,11 +160,21 @@
 
         setStatus('Starting download…');
         startDownload(response.buffer, response.filename).then(function(result) {
-            setStatus(result.ok ? 'Saved to Downloads.' : (result.message || 'Download failed.'));
+            if (result.ok) {
+                setStatus('Saved to Downloads folder.');
+                try {
+                    // Reveal the file in the system Downloads UI so success is obvious.
+                    chrome.downloads.show(result.downloadId);
+                } catch (e) {
+                    // ignore
+                }
+            } else {
+                setStatus(result.message || 'Download failed.');
+            }
             return reportResult(result).then(function() {
                 window.setTimeout(function() {
                     window.close();
-                }, result.ok ? 500 : 1800);
+                }, result.ok ? 800 : 1800);
             });
         });
     });
