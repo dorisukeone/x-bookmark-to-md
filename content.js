@@ -181,16 +181,10 @@ const SENSITIVE_REVEAL_BUTTON_PATTERN = /^(show|view|display|表示する|表示
  * 既存セレクタは変更せず、可視プレースホルダーのみを対象とする。
  */
 function detectSensitiveContentPlaceholder(tweetElement) {
-    const sensitiveTestIds = [
-        'tweet-text-show-more-link',
-        'app-text-transition-container',
-        'mask',
-        'placementTracking'
-    ];
-    for (const testId of sensitiveTestIds) {
-        if (tweetElement.querySelector(`[data-testid="${testId}"]`)) {
-            return true;
-        }
+    const articleText = tweetElement.textContent || '';
+    // Require explicit warning copy — "Show more" / generic reveal buttons alone are too broad.
+    if (!SENSITIVE_WARNING_PATTERN.test(articleText)) {
+        return false;
     }
 
     const buttons = tweetElement.querySelectorAll('button, [role="button"]');
@@ -201,21 +195,8 @@ function detectSensitiveContentPlaceholder(tweetElement) {
         }
     }
 
-    const articleText = tweetElement.textContent || '';
-    if (SENSITIVE_WARNING_PATTERN.test(articleText)) {
-        return true;
-    }
-
-    if (/表示する/i.test(articleText)) {
-        const hasMedia = tweetElement.querySelector(
-            '[data-testid="videoPlayer"], [data-testid="tweetPhoto"], img[src*="pbs.twimg.com/media"]'
-        );
-        if (hasMedia) {
-            return true;
-        }
-    }
-
-    return false;
+    // Warning text present with no tweet body is enough (media may still be blurred).
+    return true;
 }
 
 function extractTweetData(tweetElement) {
