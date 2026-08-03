@@ -170,6 +170,54 @@ function yieldToMainThread() {
     });
 }
 
+const SENSITIVE_PLACEHOLDER_TEXT = '（閲覧注意のため本文非表示）';
+
+const SENSITIVE_WARNING_PATTERN = /sensitive|content warning|閲覧注意|センシティブな内容|センシティブ|caution/i;
+
+const SENSITIVE_REVEAL_BUTTON_PATTERN = /^(show|view|display|表示する|表示)$/i;
+
+/**
+ * 本文が空のとき、センシティブ/閲覧注意プレースホルダーUIの存在を保守的に検出する。
+ * 既存セレクタは変更せず、可視プレースホルダーのみを対象とする。
+ */
+function detectSensitiveContentPlaceholder(tweetElement) {
+    const sensitiveTestIds = [
+        'tweet-text-show-more-link',
+        'app-text-transition-container',
+        'mask',
+        'placementTracking'
+    ];
+    for (const testId of sensitiveTestIds) {
+        if (tweetElement.querySelector(`[data-testid="${testId}"]`)) {
+            return true;
+        }
+    }
+
+    const buttons = tweetElement.querySelectorAll('button, [role="button"]');
+    for (const btn of buttons) {
+        const label = (btn.textContent || btn.getAttribute('aria-label') || '').trim();
+        if (SENSITIVE_REVEAL_BUTTON_PATTERN.test(label)) {
+            return true;
+        }
+    }
+
+    const articleText = tweetElement.textContent || '';
+    if (SENSITIVE_WARNING_PATTERN.test(articleText)) {
+        return true;
+    }
+
+    if (/表示する/i.test(articleText)) {
+        const hasMedia = tweetElement.querySelector(
+            '[data-testid="videoPlayer"], [data-testid="tweetPhoto"], img[src*="pbs.twimg.com/media"]'
+        );
+        if (hasMedia) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 function extractTweetData(tweetElement) {
     const bookmark = {
         text: '',
@@ -192,6 +240,10 @@ function extractTweetData(tweetElement) {
             if (fallbackTextElement) {
                 bookmark.text = fallbackTextElement.textContent.trim();
             }
+        }
+
+        if (!bookmark.text && detectSensitiveContentPlaceholder(tweetElement)) {
+            bookmark.text = SENSITIVE_PLACEHOLDER_TEXT;
         }
 
         // 作者情報を取得
