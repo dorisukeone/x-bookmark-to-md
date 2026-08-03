@@ -262,12 +262,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
         var response;
         try {
+            // Extraction can take many minutes while scrolling; do not use the short ping timeout.
+            // Still classify 'message port closed' via lastError when the channel drops.
             response = await sendTabMessage(tabId, {
                 action: 'exportBookmarks',
                 maxBookmarks: maxVal,
                 incrementalOnly: incrementalOnly,
                 knownTweetUrls: incrementalOnly ? knownTweetUrls : []
-            });
+            }, 0);
         } catch (err) {
             handleSendMessageError(err, 'extract');
             return;
@@ -301,23 +303,28 @@ document.addEventListener('DOMContentLoaded', function() {
         var waitMs = timeoutMs == null ? SEND_MESSAGE_TIMEOUT_MS : timeoutMs;
         return new Promise(function(resolve, reject) {
             var settled = false;
-            var timer = window.setTimeout(function() {
-                if (settled) {
-                    return;
-                }
-                settled = true;
-                var err = new Error('The page did not respond in time. Reload the page and try again.');
-                err.stage = 'message_timeout';
-                err.reasonCode = 'message_timeout';
-                reject(err);
-            }, waitMs);
+            var timer = null;
+            if (waitMs > 0) {
+                timer = window.setTimeout(function() {
+                    if (settled) {
+                        return;
+                    }
+                    settled = true;
+                    var err = new Error('The page did not respond in time. Reload the page and try again.');
+                    err.stage = 'message_timeout';
+                    err.reasonCode = 'message_timeout';
+                    reject(err);
+                }, waitMs);
+            }
 
             chrome.tabs.sendMessage(tabId, message, function(response) {
                 if (settled) {
                     return;
                 }
                 settled = true;
-                window.clearTimeout(timer);
+                if (timer !== null) {
+                    window.clearTimeout(timer);
+                }
 
                 if (chrome.runtime.lastError) {
                     var sendErr = new Error(chrome.runtime.lastError.message);
