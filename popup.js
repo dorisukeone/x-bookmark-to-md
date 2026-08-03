@@ -2,6 +2,8 @@ document.addEventListener('DOMContentLoaded', function() {
     /** Slider index → maxBookmarks for content script (0 = unlimited) */
     const CAP_BY_INDEX = [0, 50, 100, 200, 500, 1000];
     const MAX_STORED_URLS = 8000;
+    /** Max wait for chrome.tabs.sendMessage callback before treating the export as timed out */
+    const SEND_MESSAGE_TIMEOUT_MS = 10000;
 
     const exportBtn = document.getElementById('exportBtn');
     const cancelExportBtn = document.getElementById('cancelExportBtn');
@@ -222,61 +224,141 @@ document.addEventListener('DOMContentLoaded', function() {
         var maxVal = indexToMax(capSlider.value);
         var incrementalOnly = isIncrementalMode();
 
-        chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-            var tabId = tabs[0].id;
-            chrome.tabs.sendMessage(tabId, {action: 'ping'}, function(response) {
-                if (chrome.runtime.lastError || !response || response.status !== 'ok') {
-                    if (isReceivingEndMissingError(chrome.runtime.lastError)) {
-                        showError('Could not connect to the page. Please keep the X/Twitter bookmarks page open, reload it, and try again.', 'receiving_end_missing', 'connection');
-                    } else {
-                        showError('Failed to connect. Reload the page and try again.', 'connection_failed', 'connect');
+        runExportFlow(maxVal, incrementalOnly).catch(function(err) {
+            showError(err && err.message ? err.message : 'Export failed.', 'unexpected_failed', (err && err.stage) || 'unknown');
+        });
+    }
+
+    async function runExportFlow(maxVal, incrementalOnly) {
+        var tabs = await queryTabs({active: true, currentWindow: true});
+        var tabId = tabs[0].id;
+
+        var pingResponse;
+        try {
+            pingResponse = await sendTabMessage(tabId, {action: 'ping'});
+        } catch (err) {
+            handleSendMessageError(err, 'connect');
+            return;
+        }
+
+        if (!pingResponse || pingResponse.status !== 'ok') {
+            showError('Failed to connect. Reload the page and try again.', 'connection_failed', 'connect');
+            return;
+        }
+
+        if (cancelRequested) {
+            finishCanceled();
+            return;
+        }
+
+        updateStatus('processing', 'Working…');
+
+        var data = await storageGet(['exportedTweetUrls']);
+        var knownTweetUrls = (data.exportedTweetUrls || [])
+            .map(normalizeTweetUrl)
+            .filter(Boolean);
+
+        var response;
+        try {
+            // Extraction can take many minutes while scrolling; do not use the short ping timeout.
+            // Still classify 'message port closed' via lastError when the channel drops.
+            response = await sendTabMessage(tabId, {
+                action: 'exportBookmarks',
+                maxBookmarks: maxVal,
+                incrementalOnly: incrementalOnly,
+                knownTweetUrls: incrementalOnly ? knownTweetUrls : []
+            }, 0);
+        } catch (err) {
+            handleSendMessageError(err, 'extract');
+            return;
+        }
+
+        if (cancelRequested) {
+            finishCanceled();
+            return;
+        }
+
+        if (response && response.success) {
+            await handleExportSuccess(response.data, {incrementalOnly: incrementalOnly, cap: maxVal});
+        } else {
+            showError(response ? response.error : 'An unknown error occurred', 'scrape_failed', 'extract');
+        }
+    }
+
+    function queryTabs(queryInfo) {
+        return new Promise(function(resolve) {
+            chrome.tabs.query(queryInfo, resolve);
+        });
+    }
+
+    function storageGet(keys) {
+        return new Promise(function(resolve) {
+            chrome.storage.local.get(keys, resolve);
+        });
+    }
+
+    function sendTabMessage(tabId, message, timeoutMs) {
+        var waitMs = timeoutMs == null ? SEND_MESSAGE_TIMEOUT_MS : timeoutMs;
+        return new Promise(function(resolve, reject) {
+            var settled = false;
+            var timer = null;
+            if (waitMs > 0) {
+                timer = window.setTimeout(function() {
+                    if (settled) {
+                        return;
                     }
+                    settled = true;
+                    var err = new Error('The page did not respond in time. Reload the page and try again.');
+                    err.stage = 'message_timeout';
+                    err.reasonCode = 'message_timeout';
+                    reject(err);
+                }, waitMs);
+            }
+
+            chrome.tabs.sendMessage(tabId, message, function(response) {
+                if (settled) {
+                    return;
+                }
+                settled = true;
+                if (timer !== null) {
+                    window.clearTimeout(timer);
+                }
+
+                if (chrome.runtime.lastError) {
+                    var sendErr = new Error(chrome.runtime.lastError.message);
+                    if (isReceivingEndMissingError(chrome.runtime.lastError)) {
+                        sendErr.stage = 'connection';
+                        sendErr.reasonCode = 'receiving_end_missing';
+                    } else if (isMessagePortClosedError(chrome.runtime.lastError)) {
+                        sendErr.stage = 'message_timeout';
+                        sendErr.reasonCode = 'message_port_closed';
+                        sendErr.message = 'Connection to the page was lost. Reload the page and try again.';
+                    } else {
+                        sendErr.reasonCode = 'runtime_error';
+                    }
+                    reject(sendErr);
                     return;
                 }
 
-                if (cancelRequested) {
-                    finishCanceled();
-                    return;
-                }
-
-                updateStatus('processing', 'Working…');
-
-                chrome.storage.local.get(['exportedTweetUrls'], function(data) {
-                    var knownTweetUrls = (data.exportedTweetUrls || [])
-                        .map(normalizeTweetUrl)
-                        .filter(Boolean);
-
-                    chrome.tabs.sendMessage(tabId, {
-                        action: 'exportBookmarks',
-                        maxBookmarks: maxVal,
-                        incrementalOnly: incrementalOnly,
-                        knownTweetUrls: incrementalOnly ? knownTweetUrls : []
-                    }, function(response) {
-                        if (chrome.runtime.lastError) {
-                            if (isReceivingEndMissingError(chrome.runtime.lastError)) {
-                                showError('Could not connect to the page. Please keep the X/Twitter bookmarks page open, reload it, and try again.', 'receiving_end_missing', 'connection');
-                            } else {
-                                showError('An error occurred: ' + chrome.runtime.lastError.message, 'runtime_error', 'extract');
-                            }
-                            return;
-                        }
-
-                        if (cancelRequested) {
-                            finishCanceled();
-                            return;
-                        }
-
-                        if (response && response.success) {
-                            handleExportSuccess(response.data, {incrementalOnly: incrementalOnly, cap: maxVal}).catch(function(err) {
-                                showError(err && err.message ? err.message : 'Export failed.', 'unexpected_failed', (err && err.stage) || 'unknown');
-                            });
-                        } else {
-                            showError(response ? response.error : 'An unknown error occurred', 'scrape_failed', 'extract');
-                        }
-                    });
-                });
+                resolve(response);
             });
         });
+    }
+
+    function handleSendMessageError(err, defaultStage) {
+        if (err && err.stage === 'message_timeout') {
+            showError(err.message, err.reasonCode || 'message_timeout', 'message_timeout');
+            return;
+        }
+        if (err && (err.stage === 'connection' || err.reasonCode === 'receiving_end_missing')) {
+            showError('Could not connect to the page. Please keep the X/Twitter bookmarks page open, reload it, and try again.', 'receiving_end_missing', 'connection');
+            return;
+        }
+        if (defaultStage === 'connect') {
+            showError('Failed to connect. Reload the page and try again.', 'connection_failed', 'connect');
+        } else {
+            showError('An error occurred: ' + (err && err.message ? err.message : 'Unknown error'), 'runtime_error', 'extract');
+        }
     }
 
     exportBtn.addEventListener('click', startExport);
@@ -513,25 +595,31 @@ document.addEventListener('DOMContentLoaded', function() {
             var safeUsername = username.replace(/[^a-zA-Z0-9_-]/g, '_');
             var filename = 'Bookmark @' + safeUsername + '_' + String(index + 1).padStart(3, '0') + '.md';
 
-            var markdown = '# ' + (bookmark.author || 'Unknown') + '\n\n';
-            markdown += '**Author:** @' + (bookmark.username || 'unknown') + '\n';
-            markdown += '**Date:** ' + (bookmark.date || 'Unknown') + '\n';
-            markdown += '**URL:** ' + (bookmark.url || 'N/A') + '\n\n';
+            var author = sanitizeExportText(bookmark.author || 'Unknown');
+            var displayUsername = sanitizeExportText(bookmark.username || 'unknown');
+            var date = sanitizeExportText(bookmark.date || 'Unknown');
+            var url = sanitizeExportText(bookmark.url || 'N/A');
+            var text = sanitizeExportText(bookmark.text || 'No text');
+
+            var markdown = '# ' + author + '\n\n';
+            markdown += '**Author:** @' + displayUsername + '\n';
+            markdown += '**Date:** ' + date + '\n';
+            markdown += '**URL:** ' + url + '\n\n';
             markdown += '---\n\n';
             markdown += '## Content\n\n';
-            markdown += (bookmark.text || 'No text') + '\n\n';
+            markdown += text + '\n\n';
 
             if (bookmark.images && bookmark.images.length > 0) {
                 markdown += '## Images (' + bookmark.images.length + ')\n\n';
                 bookmark.images.forEach(function(img, i) {
-                    markdown += '![' + 'Image ' + (i + 1) + '](' + img + ')\n\n';
+                    markdown += '![' + 'Image ' + (i + 1) + '](' + sanitizeExportText(img) + ')\n\n';
                 });
             }
 
             if (bookmark.links && bookmark.links.length > 0) {
                 markdown += '## Links\n\n';
                 bookmark.links.forEach(function(link) {
-                    markdown += '- [' + (link.text || link.url) + '](' + link.url + ')\n';
+                    markdown += '- [' + sanitizeExportText(link.text || link.url) + '](' + sanitizeExportText(link.url) + ')\n';
                 });
                 markdown += '\n';
             }
@@ -550,6 +638,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function isReceivingEndMissingError(lastError) {
         return !!(lastError && lastError.message && lastError.message.indexOf('Receiving end does not exist') !== -1);
+    }
+
+    function isMessagePortClosedError(lastError) {
+        return !!(lastError && lastError.message && lastError.message.toLowerCase().indexOf('message port closed') !== -1);
     }
 
     function showError(message, reasonCode, stage) {
