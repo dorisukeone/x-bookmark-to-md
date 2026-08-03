@@ -439,25 +439,31 @@ document.addEventListener('DOMContentLoaded', function() {
             var safeUsername = username.replace(/[^a-zA-Z0-9_-]/g, '_');
             var filename = 'Bookmark @' + safeUsername + '_' + String(index + 1).padStart(3, '0') + '.md';
 
-            var markdown = '# ' + (bookmark.author || 'Unknown') + '\n\n';
-            markdown += '**Author:** @' + (bookmark.username || 'unknown') + '\n';
-            markdown += '**Date:** ' + (bookmark.date || 'Unknown') + '\n';
-            markdown += '**URL:** ' + (bookmark.url || 'N/A') + '\n\n';
+            var author = sanitizeExportText(bookmark.author || 'Unknown');
+            var displayUsername = sanitizeExportText(bookmark.username || 'unknown');
+            var date = sanitizeExportText(bookmark.date || 'Unknown');
+            var url = sanitizeExportText(bookmark.url || 'N/A');
+            var text = sanitizeExportText(bookmark.text || 'No text');
+
+            var markdown = '# ' + author + '\n\n';
+            markdown += '**Author:** @' + displayUsername + '\n';
+            markdown += '**Date:** ' + date + '\n';
+            markdown += '**URL:** ' + url + '\n\n';
             markdown += '---\n\n';
             markdown += '## Content\n\n';
-            markdown += (bookmark.text || 'No text') + '\n\n';
+            markdown += text + '\n\n';
 
             if (bookmark.images && bookmark.images.length > 0) {
                 markdown += '## Images (' + bookmark.images.length + ')\n\n';
                 bookmark.images.forEach(function(img, i) {
-                    markdown += '![' + 'Image ' + (i + 1) + '](' + img + ')\n\n';
+                    markdown += '![' + 'Image ' + (i + 1) + '](' + sanitizeExportText(img) + ')\n\n';
                 });
             }
 
             if (bookmark.links && bookmark.links.length > 0) {
                 markdown += '## Links\n\n';
                 bookmark.links.forEach(function(link) {
-                    markdown += '- [' + (link.text || link.url) + '](' + link.url + ')\n';
+                    markdown += '- [' + sanitizeExportText(link.text || link.url) + '](' + sanitizeExportText(link.url) + ')\n';
                 });
                 markdown += '\n';
             }
