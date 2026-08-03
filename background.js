@@ -148,6 +148,22 @@ function setExportJob(job) {
     });
 }
 
+function pad2(n) {
+    return String(n).padStart(2, '0');
+}
+
+function buildExportZipFilename(isIncremental) {
+    var now = new Date();
+    var stamp = now.getFullYear() + '-' +
+        pad2(now.getMonth() + 1) + '-' +
+        pad2(now.getDate()) + '-' +
+        pad2(now.getHours()) +
+        pad2(now.getMinutes()) +
+        pad2(now.getSeconds());
+    var suffix = isIncremental ? '-incremental' : '';
+    return 'x-bookmarks-' + stamp + suffix + '.zip';
+}
+
 function generateIndexFile(files, isIncremental) {
     var index = '# X Bookmark Export\n\n';
     if (isIncremental) {
@@ -228,9 +244,9 @@ async function runZipAndDownload(files, isIncremental) {
             content: generateIndexFile(files, isIncremental)
         });
 
-        var datePart = new Date().toISOString().split('T')[0];
-        var suffix = isIncremental ? '-incremental' : '';
-        var filename = 'x-bookmarks-' + datePart + suffix + '.zip';
+        // Include local time so repeated exports the same day don't get Chrome's
+        // " (1)" / " (4)" uniquify suffixes from leftover download history.
+        var filename = buildExportZipFilename(!!isIncremental);
 
         await setExportJob({
             status: 'running',

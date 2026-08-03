@@ -33,7 +33,7 @@ Details:
 - **Storage** — `exportedTweetUrls` (max **8000** URLs; excess drops from the oldest side) and `lastExportAt` (ISO string, mainly for display). **This profile only**; not synced across devices.
 - **Full + cap** — Only URLs that made it into that ZIP are remembered. If you need a “complete” skip-list for incremental, run **Full** once with **∞** (or accept a partial list after a capped export).
 - **8000 cap** — Very old URLs may fall off the list and could appear as “new” again in a later incremental run.
-- **Incremental ZIP filename** — `x-bookmarks-YYYY-MM-DD-incremental.zip`; `index.md` notes incremental exports.
+- **ZIP filename** — `x-bookmarks-YYYY-MM-DD-HHmmss.zip` (incremental: `…-HHmmss-incremental.zip`); `index.md` notes incremental exports.
 
 ## How to use
 
