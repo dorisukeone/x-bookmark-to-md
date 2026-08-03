@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', function() {
     ];
 
     const exportBtn = document.getElementById('exportBtn');
+    const cancelExportBtn = document.getElementById('cancelExportBtn');
     const retryExportBtn = document.getElementById('retryExportBtn');
     const openBookmarksBtn = document.getElementById('openBookmarksBtn');
     const status = document.getElementById('status');
@@ -38,6 +39,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const extVersionEl = document.getElementById('extVersion');
 
     var isExporting = false;
+    var cancelRequested = false;
 
     try {
         var ver = chrome.runtime.getManifest().version;
@@ -212,7 +214,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function startExport() {
         isExporting = true;
+        cancelRequested = false;
         exportBtn.disabled = true;
+        if (cancelExportBtn) {
+            cancelExportBtn.disabled = false;
+        }
         updateStatus('processing', 'Connecting…');
 
         var maxVal = indexToMax(capSlider.value);
@@ -227,6 +233,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     } else {
                         showError('Failed to connect. Reload the page and try again.', 'connection_failed', 'connect');
                     }
+                    return;
+                }
+
+                if (cancelRequested) {
+                    finishCanceled();
                     return;
                 }
 
@@ -252,6 +263,11 @@ document.addEventListener('DOMContentLoaded', function() {
                             return;
                         }
 
+                        if (cancelRequested) {
+                            finishCanceled();
+                            return;
+                        }
+
                         if (response && response.success) {
                             handleExportSuccess(response.data, {incrementalOnly: incrementalOnly, cap: maxVal}).catch(function(err) {
                                 showError(err && err.message ? err.message : 'Export failed.', 'unexpected_failed', (err && err.stage) || 'unknown');
@@ -269,6 +285,26 @@ document.addEventListener('DOMContentLoaded', function() {
     if (retryExportBtn) {
         retryExportBtn.addEventListener('click', startExport);
     }
+    if (cancelExportBtn) {
+        cancelExportBtn.addEventListener('click', function() {
+            if (!isExporting || cancelRequested) {
+                return;
+            }
+            cancelRequested = true;
+            cancelExportBtn.disabled = true;
+            updateStatus('processing', 'Canceling…');
+        });
+    }
+
+    function finishCanceled() {
+        isExporting = false;
+        cancelRequested = false;
+        exportBtn.disabled = false;
+        updateStatus('warning', 'Export canceled.');
+        if (self.xbmAnalytics) {
+            self.xbmAnalytics.sendEvent('export_canceled', {});
+        }
+    }
 
     function updateStatus(type, text) {
         statusText.textContent = text;
@@ -279,6 +315,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         if (keepOpenNotice) {
             keepOpenNotice.hidden = type !== 'processing';
+        }
+        if (cancelExportBtn) {
+            cancelExportBtn.hidden = type !== 'processing';
         }
     }
 
@@ -311,6 +350,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function handleExportSuccess(bookmarks, meta) {
         var incrementalOnly = meta && meta.incrementalOnly;
+
+        if (cancelRequested) {
+            finishCanceled();
+            return;
+        }
 
         if (!bookmarks || bookmarks.length === 0) {
             isExporting = false;
@@ -348,9 +392,18 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
+        if (cancelRequested) {
+            finishCanceled();
+            return;
+        }
+
         try {
             await createAndDownloadZip(markdownFiles, !!incrementalOnly);
         } catch (err) {
+            if (err && err.exportCanceled) {
+                finishCanceled();
+                return;
+            }
             if (err && err.userCanceled) {
                 isExporting = false;
                 exportBtn.disabled = false;
@@ -421,7 +474,17 @@ document.addEventListener('DOMContentLoaded', function() {
         return files;
     }
 
+    function makeExportCanceledError() {
+        var err = new Error('Export canceled.');
+        err.exportCanceled = true;
+        return err;
+    }
+
     async function createAndDownloadZip(files, isIncremental) {
+        if (cancelRequested) {
+            throw makeExportCanceledError();
+        }
+
         if (typeof JSZip === 'undefined') {
             try {
                 await loadJSZip();
@@ -456,6 +519,10 @@ document.addEventListener('DOMContentLoaded', function() {
             zipError.stage = 'zip';
             zipError.reasonCode = isSlowZip ? 'zip_generation_large' : 'zip_failed';
             throw zipError;
+        }
+
+        if (cancelRequested) {
+            throw makeExportCanceledError();
         }
 
         var objectUrl = URL.createObjectURL(blob);
