@@ -47,6 +47,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 });
 
+const TWEET_SELECTOR = 'article[data-testid="tweet"]';
+
 async function extractBookmarks(options = {}) {
     const maxBookmarks = options.maxBookmarks > 0 ? options.maxBookmarks : null;
     const knownSet = options.incrementalOnly && options.knownTweetUrls && options.knownTweetUrls.length > 0
@@ -66,6 +68,7 @@ async function extractBookmarks(options = {}) {
     });
 
     await waitForPageLoad();
+    await waitForBookmarksToAppear();
 
     while (scrollAttempts < maxScrollAttempts) {
         const currentBookmarks = await extractVisibleBookmarks();
@@ -128,11 +131,10 @@ const EXTRACTION_BATCH_SIZE = 50;
 
 async function extractVisibleBookmarks() {
     const visibleBookmarks = [];
-    const tweetSelector = 'article[data-testid="tweet"]';
-    const tweets = document.querySelectorAll(tweetSelector);
+    const tweets = document.querySelectorAll(TWEET_SELECTOR);
 
     if (tweets.length === 0) {
-        console.log('No tweets found with selector:', tweetSelector);
+        console.log('No tweets found with selector:', TWEET_SELECTOR);
         return visibleBookmarks;
     }
 
@@ -184,8 +186,14 @@ function extractTweetData(tweetElement) {
         const textElements = tweetElement.querySelectorAll('[data-testid="tweetText"]');
         if (textElements.length > 0) {
             bookmark.text = textElements[0].textContent.trim();
+        } else {
+            // フォールバック: data-testidが変わった場合に備え、本文特有のlang属性から推定
+            const fallbackTextElement = tweetElement.querySelector('[lang]');
+            if (fallbackTextElement) {
+                bookmark.text = fallbackTextElement.textContent.trim();
+            }
         }
-        
+
         // 作者情報を取得
         const authorElements = tweetElement.querySelectorAll('[data-testid="User-Name"]');
         if (authorElements.length > 0) {
@@ -194,15 +202,18 @@ function extractTweetData(tweetElement) {
             if (nameElement) {
                 bookmark.author = nameElement.textContent.trim();
             }
-            
+
             // ユーザー名を取得
             const usernameElement = authorElement.querySelector('a[href*="/"]');
             if (usernameElement) {
                 const href = usernameElement.getAttribute('href');
                 bookmark.username = href.replace('/', '');
             }
+        } else {
+            // フォールバック: User-Nameコンテナが見つからない場合、プロフィールへのリンクから推定
+            extractAuthorFallback(tweetElement, bookmark);
         }
-        
+
         // 日時を取得
         const timeElements = tweetElement.querySelectorAll('time');
         if (timeElements.length > 0) {
@@ -247,8 +258,36 @@ function extractTweetData(tweetElement) {
     } catch (error) {
         console.error('Error extracting tweet data:', error);
     }
-    
+
     return null;
+}
+
+/**
+ * [data-testid="User-Name"] コンテナが見つからない場合のフォールバック。
+ * ツイート本文中の /status/ リンクではないプロフィールリンク（例: <a href="/username">）
+ * から author/username を推定する。既存の主経路には一切影響しない。
+ */
+function extractAuthorFallback(tweetElement, bookmark) {
+    const profileLinks = tweetElement.querySelectorAll('a[href^="/"]');
+
+    for (const link of profileLinks) {
+        const href = link.getAttribute('href') || '';
+        if (!href || href.indexOf('/status/') !== -1 || href.indexOf('/photo/') !== -1) {
+            continue;
+        }
+
+        const candidateUsername = href.replace(/^\//, '').split('/')[0].split('?')[0];
+        if (!candidateUsername) {
+            continue;
+        }
+
+        bookmark.username = candidateUsername;
+        const text = link.textContent.trim();
+        if (text) {
+            bookmark.author = text;
+        }
+        break;
+    }
 }
 
 function waitForPageLoad() {
@@ -260,6 +299,40 @@ function waitForPageLoad() {
                 setTimeout(resolve, 1000);
             });
         }
+    });
+}
+
+/**
+ * ブックマークの仮想化レンダリングが完了する前の抽出（0件/失敗）を避けるため、
+ * 最初のツイートカードがDOMに現れるまでMutationObserverで待つ。既存セレクタ・
+ * 抽出ロジックは変更せず、タイムアウト時は現行どおりそのまま抽出処理に進む。
+ */
+function waitForBookmarksToAppear(timeoutMs = 5000) {
+    return new Promise((resolve) => {
+        if (document.querySelector(TWEET_SELECTOR)) {
+            resolve();
+            return;
+        }
+
+        let settled = false;
+        const finish = () => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            observer.disconnect();
+            clearTimeout(timer);
+            resolve();
+        };
+
+        const observer = new MutationObserver(() => {
+            if (document.querySelector(TWEET_SELECTOR)) {
+                finish();
+            }
+        });
+        observer.observe(document.body, {childList: true, subtree: true});
+
+        const timer = setTimeout(finish, timeoutMs);
     });
 }
 
