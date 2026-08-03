@@ -30,6 +30,7 @@ document.addEventListener('DOMContentLoaded', function() {
     var cancelRequested = false;
     var awaitingBackgroundExport = false;
     var pendingExportMeta = null;
+    var currentTabId = null;
 
     try {
         var ver = chrome.runtime.getManifest().version;
@@ -232,6 +233,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function runExportFlow(maxVal, incrementalOnly) {
         var tabs = await queryTabs({active: true, currentWindow: true});
         var tabId = tabs[0].id;
+        currentTabId = tabId;
 
         var pingResponse;
         try {
@@ -273,7 +275,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        if (cancelRequested) {
+        if (cancelRequested || (response && response.canceled)) {
             finishCanceled();
             return;
         }
@@ -377,6 +379,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 chrome.runtime.sendMessage({action: 'cancelExportJob'}, function() {
                     void chrome.runtime.lastError;
                 });
+            } else if (currentTabId != null) {
+                chrome.tabs.sendMessage(currentTabId, {action: 'cancelExportBookmarks'}, function() {
+                    void chrome.runtime.lastError;
+                });
             }
         });
     }
@@ -386,6 +392,7 @@ document.addEventListener('DOMContentLoaded', function() {
         awaitingBackgroundExport = false;
         pendingExportMeta = null;
         cancelRequested = false;
+        currentTabId = null;
         exportBtn.disabled = false;
         updateStatus('warning', 'Export canceled.');
         if (self.xbmAnalytics) {
@@ -507,6 +514,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (!bookmarks || bookmarks.length === 0) {
             isExporting = false;
+            currentTabId = null;
             exportBtn.disabled = false;
             if (incrementalOnly) {
                 updateStatus('warning', 'Nothing new to export.');
@@ -578,6 +586,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 // Popup no longer owns the long-running work; background continues if popup closes.
                 isExporting = false;
+                currentTabId = null;
                 awaitingBackgroundExport = true;
                 cancelRequested = false;
                 updateStatus('processing', 'Saving in background…');
@@ -648,6 +657,7 @@ document.addEventListener('DOMContentLoaded', function() {
         isExporting = false;
         awaitingBackgroundExport = false;
         pendingExportMeta = null;
+        currentTabId = null;
         exportBtn.disabled = false;
         updateStatus('error', message);
         if (retryExportBtn) {

@@ -18,6 +18,7 @@ interface Manifest {
 const sourceFiles = [
   "background.js",
   "content.js",
+  "bookmark-network-hook.js",
   "popup.js",
   "url-utils.js",
   "analytics.js",
@@ -26,6 +27,7 @@ const sourceFiles = [
 const syntaxFiles = [
   "background.js",
   "content.js",
+  "bookmark-network-hook.js",
   "popup.js",
   "url-utils.js",
   "analytics.js",
@@ -113,6 +115,10 @@ try {
   if (!entries.includes("manifest.json")) fail("Package ZIP has no root-level manifest.json");
   if (entries.some((entry) => entry.startsWith("node_modules/") || entry.includes("/node_modules/"))) {
     fail("Package ZIP must not contain node_modules");
+  }
+  const entrySet = new Set(entries);
+  for (const file of references) {
+    if (!entrySet.has(file)) fail(`Package ZIP is missing a manifest-referenced file: ${file}`);
   }
 } finally {
   rmSync(zipPath, { force: true });

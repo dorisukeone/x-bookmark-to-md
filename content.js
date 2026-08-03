@@ -1,6 +1,48 @@
 // Content script for X Bookmark Exporter
 console.log('X Bookmark Exporter content script loaded');
 
+// スクロール中の抽出をポップアップからのキャンセル要求で中断するためのフラグ
+let exportCancelRequested = false;
+
+// bookmark-network-hook.js (MAIN world) が観測したBookmarks GraphQLレスポンスの蓄積。
+// DOMスクレイピングより確実にツイートIDと本当のページ終端(Bottomカーソル)が分かるため、
+// 主データ源として使う。フックが一切発火しない場合(X側の実装変更等)でも、
+// 既存のDOMスクロール抽出がそのままフォールバックとして機能する。
+let networkTweetsByUrl = new Map();
+let networkCaptureSeen = false;
+let lastBottomCursor = null;
+let bottomCursorRepeatCount = 0;
+
+window.addEventListener('message', (event) => {
+    if (event.source !== window) {
+        return;
+    }
+    const data = event.data;
+    if (!data || data.source !== 'xbm-network-hook' || data.type !== 'bookmarksPage') {
+        return;
+    }
+
+    networkCaptureSeen = true;
+    const payload = data.payload || {};
+    const tweets = Array.isArray(payload.tweets) ? payload.tweets : [];
+
+    tweets.forEach(tweet => {
+        if (!tweet || !tweet.url) {
+            return;
+        }
+        const key = normalizeTweetUrl(tweet.url);
+        if (!key || networkTweetsByUrl.has(key)) {
+            return;
+        }
+        networkTweetsByUrl.set(key, { ...tweet, url: key });
+    });
+
+    if (payload.bottomCursor) {
+        bottomCursorRepeatCount = payload.bottomCursor === lastBottomCursor ? bottomCursorRepeatCount + 1 : 0;
+        lastBottomCursor = payload.bottomCursor;
+    }
+});
+
 // メッセージリスナー
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'ping') {
@@ -9,9 +51,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return;
     }
 
+    if (request.action === 'cancelExportBookmarks') {
+        console.log('Cancel export requested');
+        exportCancelRequested = true;
+        sendResponse({ok: true});
+        return;
+    }
+
     if (request.action === 'exportBookmarks') {
         console.log('Export bookmarks request received');
-        
+
         // 現在のページがブックマークページかチェック
         if (!window.location.href.includes('/i/bookmarks')) {
             sendResponse({
@@ -20,19 +69,27 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             });
             return;
         }
-        
+
         const options = {
             maxBookmarks: request.maxBookmarks > 0 ? request.maxBookmarks : null,
             incrementalOnly: !!request.incrementalOnly,
             knownTweetUrls: Array.isArray(request.knownTweetUrls) ? request.knownTweetUrls : []
         };
-        
+
+        exportCancelRequested = false;
+        // 同一タブで複数回エクスポートした場合に前回実行の「終端到達」判定が
+        // 残らないよう、カーソル追跡状態だけ都度リセットする
+        // (networkTweetsByUrl自体は使い回して良い — extractBookmarks側で毎回
+        // 先頭から再評価するため、蓄積済みデータの再利用に問題はない)。
+        lastBottomCursor = null;
+        bottomCursorRepeatCount = 0;
         extractBookmarks(options)
-            .then(bookmarks => {
-                console.log(`Found ${bookmarks.length} bookmarks`);
+            .then(result => {
+                console.log(`Found ${result.bookmarks.length} bookmarks (canceled: ${result.canceled})`);
                 sendResponse({
-                    success: true,
-                    data: bookmarks
+                    success: !result.canceled,
+                    canceled: result.canceled,
+                    data: result.bookmarks
                 });
             })
             .catch(error => {
@@ -42,7 +99,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     error: error.message
                 });
             });
-        
+
         return true; // 非同期レスポンスを示す
     }
 });
@@ -59,6 +116,35 @@ async function extractBookmarks(options = {}) {
     let scrollAttempts = 0;
     const maxScrollAttempts = 1000;
     let stableCount = 0;
+    // Bookmarks are listed newest-first, so once we've scrolled past a run of
+    // already-exported tweets with nothing new mixed in, everything further
+    // down is older history we've already exported — stop instead of
+    // continuing to scroll to the very bottom of the whole bookmark list.
+    let knownStreak = 0;
+    const KNOWN_STREAK_LIMIT = 3;
+    let canceled = false;
+    // networkTweetsByUrl accumulates in insertion order; this pointer lets us pull
+    // only the entries that arrived since the last iteration (mirrors "this batch"
+    // semantics of the DOM scrape below) instead of re-scanning everything each time.
+    let networkProcessedCount = 0;
+
+    const considerBookmark = (bookmark, counters) => {
+        if (!bookmark || !bookmark.url) {
+            return;
+        }
+        const key = normalizeTweetUrl(bookmark.url);
+        if (!key) {
+            return;
+        }
+        if (knownSet && knownSet.has(key)) {
+            counters.known++;
+            return;
+        }
+        if (!bookmarks.has(key)) {
+            bookmarks.set(key, { ...bookmark, url: key });
+            counters.new++;
+        }
+    };
 
     console.log('Starting bookmark extraction...', {
         maxBookmarks,
@@ -71,28 +157,58 @@ async function extractBookmarks(options = {}) {
     await waitForBookmarksToAppear();
 
     while (scrollAttempts < maxScrollAttempts) {
+        if (exportCancelRequested) {
+            console.log('Export canceled, stopping extraction...');
+            canceled = true;
+            break;
+        }
+
+        const counters = { new: 0, known: 0 };
+
+        // 一次データ源: bookmark-network-hook.js が捕捉したGraphQLレスポンス（確実なツイートID）
+        const allNetworkTweets = Array.from(networkTweetsByUrl.values());
+        const freshNetworkTweets = allNetworkTweets.slice(networkProcessedCount);
+        networkProcessedCount = allNetworkTweets.length;
+        freshNetworkTweets.forEach(bookmark => considerBookmark(bookmark, counters));
+
+        // フォールバック/補完: フックが取りこぼした場合に備えたDOMスクレイピング
         const currentBookmarks = await extractVisibleBookmarks();
+        currentBookmarks.forEach(bookmark => considerBookmark(bookmark, counters));
 
-        currentBookmarks.forEach(bookmark => {
-            if (!bookmark.url) {
-                return;
-            }
-            const key = normalizeTweetUrl(bookmark.url);
-            if (!key) {
-                return;
-            }
-            if (knownSet && knownSet.has(key)) {
-                return;
-            }
-            if (!bookmarks.has(key)) {
-                bookmarks.set(key, { ...bookmark, url: key });
-            }
+        console.log(`Scroll attempt ${scrollAttempts + 1}: Found ${bookmarks.size} total bookmarks`, {
+            networkCaptureSeen,
+            newInThisBatch: counters.new,
+            knownInThisBatch: counters.known
         });
-
-        console.log(`Scroll attempt ${scrollAttempts + 1}: Found ${bookmarks.size} total bookmarks`);
 
         if (maxBookmarks && bookmarks.size >= maxBookmarks) {
             console.log('Reached max bookmarks limit, stopping...');
+            break;
+        }
+
+        if (knownSet) {
+            if (counters.known > 0 && counters.new === 0) {
+                knownStreak++;
+                if (knownStreak >= KNOWN_STREAK_LIMIT) {
+                    console.log('Reached previously exported bookmarks, stopping incremental scan...');
+                    break;
+                }
+            } else if (counters.new > 0) {
+                knownStreak = 0;
+            }
+        }
+
+        // Bottomカーソルが2回連続で同じ値 = Xがこれ以上新しいページを返していない
+        // = 本当にリストの終端に到達したという確定的なシグナル。DOM側の高さ/件数の
+        // 変化待ち(stableCount)より速く正確に判定できる。
+        if (networkCaptureSeen && bottomCursorRepeatCount >= 1) {
+            console.log('Bottom cursor repeated (network-confirmed end of bookmarks), stopping...');
+            break;
+        }
+
+        if (exportCancelRequested) {
+            console.log('Export canceled, stopping extraction...');
+            canceled = true;
             break;
         }
 
@@ -124,7 +240,7 @@ async function extractBookmarks(options = {}) {
     }
 
     console.log(`Extraction completed. Total bookmarks: ${result.length}`);
-    return result;
+    return { bookmarks: result, canceled };
 }
 
 const EXTRACTION_BATCH_SIZE = 50;

@@ -14,6 +14,7 @@ zip -r "$OUT" \
   manifest.json \
   background.js \
   content.js \
+  bookmark-network-hook.js \
   popup.html \
   popup.css \
   popup.js \
