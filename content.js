@@ -170,6 +170,35 @@ function yieldToMainThread() {
     });
 }
 
+const SENSITIVE_PLACEHOLDER_TEXT = '（閲覧注意のため本文非表示）';
+
+const SENSITIVE_WARNING_PATTERN = /sensitive|content warning|閲覧注意|センシティブな内容|センシティブ|caution/i;
+
+const SENSITIVE_REVEAL_BUTTON_PATTERN = /^(show|view|display|表示する|表示)$/i;
+
+/**
+ * 本文が空のとき、センシティブ/閲覧注意プレースホルダーUIの存在を保守的に検出する。
+ * 既存セレクタは変更せず、可視プレースホルダーのみを対象とする。
+ */
+function detectSensitiveContentPlaceholder(tweetElement) {
+    const articleText = tweetElement.textContent || '';
+    // Require explicit warning copy — "Show more" / generic reveal buttons alone are too broad.
+    if (!SENSITIVE_WARNING_PATTERN.test(articleText)) {
+        return false;
+    }
+
+    const buttons = tweetElement.querySelectorAll('button, [role="button"]');
+    for (const btn of buttons) {
+        const label = (btn.textContent || btn.getAttribute('aria-label') || '').trim();
+        if (SENSITIVE_REVEAL_BUTTON_PATTERN.test(label)) {
+            return true;
+        }
+    }
+
+    // Warning text present with no tweet body is enough (media may still be blurred).
+    return true;
+}
+
 /**
  * 引用ツイート内のネスト article[data-testid="tweet"] 配下を除外し、
  * 外側ツイート自身に属する要素だけを返す。
@@ -208,6 +237,10 @@ function extractTweetData(tweetElement) {
             if (fallbackTextElement) {
                 bookmark.text = fallbackTextElement.textContent.trim();
             }
+        }
+
+        if (!bookmark.text && detectSensitiveContentPlaceholder(tweetElement)) {
+            bookmark.text = SENSITIVE_PLACEHOLDER_TEXT;
         }
 
         // 作者情報を取得
