@@ -170,6 +170,22 @@ function yieldToMainThread() {
     });
 }
 
+/**
+ * 引用ツイート内のネスト article[data-testid="tweet"] 配下を除外し、
+ * 外側ツイート自身に属する要素だけを返す。
+ */
+function queryAllInOwnTweet(root, selector) {
+    return Array.from(root.querySelectorAll(selector)).filter(el => {
+        const article = el.closest('article[data-testid="tweet"]');
+        return article === root;
+    });
+}
+
+function queryInOwnTweet(root, selector) {
+    const matches = queryAllInOwnTweet(root, selector);
+    return matches.length > 0 ? matches[0] : null;
+}
+
 function extractTweetData(tweetElement) {
     const bookmark = {
         text: '',
@@ -183,19 +199,19 @@ function extractTweetData(tweetElement) {
     
     try {
         // ツイートテキストを取得
-        const textElements = tweetElement.querySelectorAll('[data-testid="tweetText"]');
+        const textElements = queryAllInOwnTweet(tweetElement, '[data-testid="tweetText"]');
         if (textElements.length > 0) {
             bookmark.text = textElements[0].textContent.trim();
         } else {
             // フォールバック: data-testidが変わった場合に備え、本文特有のlang属性から推定
-            const fallbackTextElement = tweetElement.querySelector('[lang]');
+            const fallbackTextElement = queryInOwnTweet(tweetElement, '[lang]');
             if (fallbackTextElement) {
                 bookmark.text = fallbackTextElement.textContent.trim();
             }
         }
 
         // 作者情報を取得
-        const authorElements = tweetElement.querySelectorAll('[data-testid="User-Name"]');
+        const authorElements = queryAllInOwnTweet(tweetElement, '[data-testid="User-Name"]');
         if (authorElements.length > 0) {
             const authorElement = authorElements[0];
             const nameElement = authorElement.querySelector('span');
@@ -215,13 +231,13 @@ function extractTweetData(tweetElement) {
         }
 
         // 日時を取得
-        const timeElements = tweetElement.querySelectorAll('time');
+        const timeElements = queryAllInOwnTweet(tweetElement, 'time');
         if (timeElements.length > 0) {
             bookmark.date = timeElements[0].getAttribute('datetime') || timeElements[0].textContent;
         }
         
         // ツイートURLを取得
-        const linkElements = tweetElement.querySelectorAll('a[href*="/status/"]');
+        const linkElements = queryAllInOwnTweet(tweetElement, 'a[href*="/status/"]');
         if (linkElements.length > 0) {
             const href = linkElements[0].getAttribute('href');
             const raw = href.startsWith('http') ? href : `https://x.com${href}`;
@@ -229,7 +245,7 @@ function extractTweetData(tweetElement) {
         }
         
         // 画像を取得
-        const imageElements = tweetElement.querySelectorAll('img[src*="pbs.twimg.com"]');
+        const imageElements = queryAllInOwnTweet(tweetElement, 'img[src*="pbs.twimg.com"]');
         imageElements.forEach(img => {
             // アイコン画像を除外する（親要素にdata-testid="Tweet-User-Avatar"がないことを確認）
             if (!img.closest('[data-testid="Tweet-User-Avatar"]')) {
@@ -241,7 +257,7 @@ function extractTweetData(tweetElement) {
         });
         
         // リンクを取得
-        const cardLinks = tweetElement.querySelectorAll('a[href*="t.co"]');
+        const cardLinks = queryAllInOwnTweet(tweetElement, 'a[href*="t.co"]');
         cardLinks.forEach(link => {
             const href = link.getAttribute('href');
             const text = link.textContent.trim();
@@ -268,7 +284,7 @@ function extractTweetData(tweetElement) {
  * から author/username を推定する。既存の主経路には一切影響しない。
  */
 function extractAuthorFallback(tweetElement, bookmark) {
-    const profileLinks = tweetElement.querySelectorAll('a[href^="/"]');
+    const profileLinks = queryAllInOwnTweet(tweetElement, 'a[href^="/"]');
 
     for (const link of profileLinks) {
         const href = link.getAttribute('href') || '';
