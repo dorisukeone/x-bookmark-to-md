@@ -1,11 +1,15 @@
-importScripts('analytics-config.js', 'analytics.js', 'jszip.min.js');
-
-var ZIP_GENERATION_SLOW_MS = 15000;
+importScripts('analytics-config.js', 'analytics.js');
 
 var exportCancelRequested = false;
 var keepAliveTimer = null;
 var exportRunning = false;
-/** @type {{ buffer: ArrayBuffer, filename: string, resolve: Function, reject: Function, windowId?: number } | null} */
+/**
+ * Pending export handed to download.html.
+ * Files are plain text markdown — ZIP is built in the download page so we never
+ * transfer binary ArrayBuffers through extension messaging (that produced a
+ * corrupt 15-byte "[object Object]" file).
+ * @type {{ files: Array<{filename: string, content: string}>, filename: string, resolve: Function, reject: Function, windowId?: number } | null}
+ */
 var pendingDownload = null;
 
 chrome.runtime.onInstalled.addListener((details) => {
@@ -43,7 +47,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         exportRunning = true;
         setExportJob({
             status: 'running',
-            message: 'Creating ZIP…',
+            message: 'Preparing files…',
             stage: 'zip',
             ts: Date.now(),
             count: Array.isArray(request.files) ? request.files.length : 0
@@ -77,9 +81,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         return true;
     }
 
-    // download.html claims the in-memory ZIP produced by the service worker.
-    // MV3 workers cannot reliably use URL.createObjectURL / large data: URLs with
-    // chrome.downloads + saveAs, so a tiny extension page performs the download.
+    // download.html claims markdown files and builds the ZIP itself (has real Blob URLs).
     if (request.action === 'claimPendingDownload') {
         if (!pendingDownload) {
             sendResponse({ok: false});
@@ -87,7 +89,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         }
         sendResponse({
             ok: true,
-            buffer: pendingDownload.buffer,
+            files: pendingDownload.files,
             filename: pendingDownload.filename
         });
         return;
@@ -104,7 +106,10 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
             pending.resolve(request.downloadId);
         } else {
             var err = new Error(request.message || 'Download failed.');
-            err.stage = 'download';
+            err.stage = request.reasonCode && String(request.reasonCode).indexOf('zip') === 0
+                ? 'zip'
+                : 'download';
+            err.reasonCode = request.reasonCode || 'zip_download_failed';
             err.userCanceled = !!request.userCanceled;
             if (request.reason && request.reason !== 'USER_CANCELED' && self.xbmAnalytics) {
                 self.xbmAnalytics.sendEvent('export_error', {
@@ -162,11 +167,10 @@ function generateIndexFile(files, isIncremental) {
 }
 
 /**
- * Open a small extension page that can use URL.createObjectURL and show saveAs.
- * Service-worker chrome.downloads with data: URLs is unreliable (size limits /
- * missing user-gesture for save dialogs).
+ * Open download.html which builds the ZIP with JSZip and saves via blob URL.
+ * Avoids service-worker binary transfer bugs and saveAs-without-gesture hangs.
  */
-function openDownloadPage(arrayBuffer, filename) {
+function openDownloadPage(filesWithIndex, filename) {
     return new Promise(function(resolve, reject) {
         if (pendingDownload) {
             reject(Object.assign(new Error('Another download is already pending.'), {
@@ -177,7 +181,7 @@ function openDownloadPage(arrayBuffer, filename) {
         }
 
         pendingDownload = {
-            buffer: arrayBuffer,
+            files: filesWithIndex,
             filename: filename,
             resolve: resolve,
             reject: reject
@@ -218,18 +222,15 @@ async function runZipAndDownload(files, isIncremental) {
             return;
         }
 
-        if (typeof JSZip === 'undefined') {
-            throw Object.assign(new Error('ZIP library is not available in the background worker.'), {
-                stage: 'zip',
-                reasonCode: 'zip_failed'
-            });
-        }
-
-        var zip = new JSZip();
-        files.forEach(function(file) {
-            zip.file(file.filename, file.content);
+        var filesWithIndex = files.slice();
+        filesWithIndex.push({
+            filename: 'index.md',
+            content: generateIndexFile(files, isIncremental)
         });
-        zip.file('index.md', generateIndexFile(files, isIncremental));
+
+        var datePart = new Date().toISOString().split('T')[0];
+        var suffix = isIncremental ? '-incremental' : '';
+        var filename = 'x-bookmarks-' + datePart + suffix + '.zip';
 
         await setExportJob({
             status: 'running',
@@ -238,26 +239,6 @@ async function runZipAndDownload(files, isIncremental) {
             ts: Date.now(),
             count: files.length
         });
-
-        var zipStartedAt = Date.now();
-        var isSlowZip = false;
-        var blob;
-        try {
-            blob = await zip.generateAsync({
-                type: 'blob',
-                compression: 'DEFLATE',
-                compressionOptions: {level: 1}
-            }, function onUpdate() {
-                if (!isSlowZip && Date.now() - zipStartedAt > ZIP_GENERATION_SLOW_MS) {
-                    isSlowZip = true;
-                }
-            });
-        } catch (err) {
-            var zipError = new Error(err && err.message ? err.message : 'ZIP generation failed.');
-            zipError.stage = 'zip';
-            zipError.reasonCode = isSlowZip ? 'zip_generation_large' : 'zip_failed';
-            throw zipError;
-        }
 
         if (exportCancelRequested) {
             await setExportJob({
@@ -276,12 +257,7 @@ async function runZipAndDownload(files, isIncremental) {
             count: files.length
         });
 
-        var buffer = await blob.arrayBuffer();
-        var datePart = new Date().toISOString().split('T')[0];
-        var suffix = isIncremental ? '-incremental' : '';
-        var filename = 'x-bookmarks-' + datePart + suffix + '.zip';
-
-        await openDownloadPage(buffer, filename);
+        await openDownloadPage(filesWithIndex, filename);
 
         await setExportJob({
             status: 'success',

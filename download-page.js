@@ -1,6 +1,7 @@
 (function() {
     var statusEl = document.getElementById('status');
     var DOWNLOAD_WAIT_MS = 60000;
+    var ZIP_GENERATION_SLOW_MS = 15000;
 
     function setStatus(text) {
         if (statusEl) {
@@ -16,7 +17,8 @@
                 downloadId: result.downloadId,
                 userCanceled: !!result.userCanceled,
                 message: result.message || '',
-                reason: result.reason || ''
+                reason: result.reason || '',
+                reasonCode: result.reasonCode || ''
             }, function() {
                 void chrome.runtime.lastError;
                 resolve();
@@ -85,7 +87,6 @@
 
             chrome.downloads.onChanged.addListener(onChanged);
 
-            // State may already be terminal before the listener was attached.
             chrome.downloads.search({id: downloadId}, function(results) {
                 if (chrome.runtime.lastError || settled) {
                     return;
@@ -106,14 +107,41 @@
         });
     }
 
-    function startDownload(buffer, filename) {
-        var blob = new Blob([buffer], {type: 'application/zip'});
+    function buildZipBlob(files) {
+        if (typeof JSZip === 'undefined') {
+            return Promise.reject(Object.assign(new Error('ZIP library failed to load.'), {
+                reasonCode: 'zip_failed'
+            }));
+        }
+
+        var zip = new JSZip();
+        files.forEach(function(file) {
+            zip.file(file.filename, file.content);
+        });
+
+        var zipStartedAt = Date.now();
+        var isSlowZip = false;
+
+        return zip.generateAsync({
+            type: 'blob',
+            compression: 'DEFLATE',
+            compressionOptions: {level: 1}
+        }, function onUpdate() {
+            if (!isSlowZip && Date.now() - zipStartedAt > ZIP_GENERATION_SLOW_MS) {
+                isSlowZip = true;
+            }
+        }).catch(function(err) {
+            throw Object.assign(new Error(err && err.message ? err.message : 'ZIP generation failed.'), {
+                reasonCode: isSlowZip ? 'zip_generation_large' : 'zip_failed'
+            });
+        });
+    }
+
+    function startDownload(blob, filename) {
         var objectUrl = URL.createObjectURL(blob);
 
         return new Promise(function(resolve) {
-            // saveAs:true needs a user gesture; this page is opened by the extension
-            // so the Save As dialog never appears and the download hangs. Save directly
-            // into the default Downloads folder instead (uniquify on name clash).
+            // No user gesture here, so saveAs:true hangs. Save to Downloads directly.
             chrome.downloads.download({
                 url: objectUrl,
                 filename: filename,
@@ -158,12 +186,32 @@
             return;
         }
 
-        setStatus('Starting download…');
-        startDownload(response.buffer, response.filename).then(function(result) {
+        var files = response.files || [];
+        var filename = response.filename;
+        if (!files.length || !filename) {
+            setStatus('Export data missing.');
+            reportResult({ok: false, message: 'Export data missing.'}).then(function() {
+                window.setTimeout(function() {
+                    window.close();
+                }, 1500);
+            });
+            return;
+        }
+
+        setStatus('Creating ZIP…');
+        buildZipBlob(files).then(function(blob) {
+            // Guard against the previous bug where a non-binary payload became "[object Object]".
+            if (!blob || blob.size < 4) {
+                throw Object.assign(new Error('Generated ZIP is empty or invalid.'), {
+                    reasonCode: 'zip_failed'
+                });
+            }
+            setStatus('Starting download…');
+            return startDownload(blob, filename);
+        }).then(function(result) {
             if (result.ok) {
                 setStatus('Saved to Downloads folder.');
                 try {
-                    // Reveal the file in the system Downloads UI so success is obvious.
                     chrome.downloads.show(result.downloadId);
                 } catch (e) {
                     // ignore
@@ -175,6 +223,18 @@
                 window.setTimeout(function() {
                     window.close();
                 }, result.ok ? 800 : 1800);
+            });
+        }).catch(function(err) {
+            var message = err && err.message ? err.message : 'ZIP generation failed.';
+            setStatus(message);
+            return reportResult({
+                ok: false,
+                message: message,
+                reasonCode: (err && err.reasonCode) || 'zip_failed'
+            }).then(function() {
+                window.setTimeout(function() {
+                    window.close();
+                }, 1800);
             });
         });
     });
