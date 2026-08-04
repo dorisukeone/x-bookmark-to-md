@@ -107,6 +107,28 @@
         });
     }
 
+    var ZIP_FILE_ADD_CHUNK_SIZE = 50;
+
+    function addFilesInChunks(zip, files) {
+        var index = 0;
+
+        function addNextChunk() {
+            var end = Math.min(index + ZIP_FILE_ADD_CHUNK_SIZE, files.length);
+            for (; index < end; index++) {
+                var file = files[index];
+                zip.file(file.filename, file.content);
+            }
+            if (index >= files.length) {
+                return Promise.resolve(zip);
+            }
+            return new Promise(function(resolve) {
+                window.setTimeout(resolve, 0);
+            }).then(addNextChunk);
+        }
+
+        return addNextChunk();
+    }
+
     function buildZipBlob(files) {
         if (typeof JSZip === 'undefined') {
             return Promise.reject(Object.assign(new Error('ZIP library failed to load.'), {
@@ -115,24 +137,23 @@
         }
 
         var zip = new JSZip();
-        files.forEach(function(file) {
-            zip.file(file.filename, file.content);
-        });
 
-        var zipStartedAt = Date.now();
-        var isSlowZip = false;
+        return addFilesInChunks(zip, files).then(function() {
+            var zipStartedAt = Date.now();
+            var isSlowZip = false;
 
-        return zip.generateAsync({
-            type: 'blob',
-            compression: 'DEFLATE',
-            compressionOptions: {level: 1}
-        }, function onUpdate() {
-            if (!isSlowZip && Date.now() - zipStartedAt > ZIP_GENERATION_SLOW_MS) {
-                isSlowZip = true;
-            }
-        }).catch(function(err) {
-            throw Object.assign(new Error(err && err.message ? err.message : 'ZIP generation failed.'), {
-                reasonCode: isSlowZip ? 'zip_generation_large' : 'zip_failed'
+            return zip.generateAsync({
+                type: 'blob',
+                compression: 'DEFLATE',
+                compressionOptions: {level: 1}
+            }, function onUpdate() {
+                if (!isSlowZip && Date.now() - zipStartedAt > ZIP_GENERATION_SLOW_MS) {
+                    isSlowZip = true;
+                }
+            }).catch(function(err) {
+                throw Object.assign(new Error(err && err.message ? err.message : 'ZIP generation failed.'), {
+                    reasonCode: isSlowZip ? 'zip_generation_large' : 'zip_failed'
+                });
             });
         });
     }
