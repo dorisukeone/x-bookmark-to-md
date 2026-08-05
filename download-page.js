@@ -110,7 +110,7 @@
     function buildZipBlob(files) {
         if (typeof JSZip === 'undefined') {
             return Promise.reject(Object.assign(new Error('ZIP library failed to load.'), {
-                reasonCode: 'zip_failed'
+                reasonCode: 'library_load_failed'
             }));
         }
 

@@ -106,9 +106,13 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
             pending.resolve(request.downloadId);
         } else {
             var err = new Error(request.message || 'Download failed.');
-            err.stage = request.reasonCode && String(request.reasonCode).indexOf('zip') === 0
-                ? 'zip'
-                : 'download';
+            if (request.reasonCode === 'library_load_failed') {
+                err.stage = 'library_load';
+            } else {
+                err.stage = request.reasonCode && String(request.reasonCode).indexOf('zip') === 0
+                    ? 'zip'
+                    : 'download';
+            }
             err.reasonCode = request.reasonCode || 'zip_download_failed';
             err.userCanceled = !!request.userCanceled;
             if (request.reason && request.reason !== 'USER_CANCELED' && self.xbmAnalytics) {
