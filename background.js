@@ -104,23 +104,29 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         pendingDownload = null;
         if (request.ok) {
             pending.resolve(request.downloadId);
-        } else {
-            var err = new Error(request.message || 'Download failed.');
-            err.stage = request.reasonCode && String(request.reasonCode).indexOf('zip') === 0
-                ? 'zip'
-                : 'download';
-            err.reasonCode = request.reasonCode || 'zip_download_failed';
-            err.userCanceled = !!request.userCanceled;
-            if (request.reason && request.reason !== 'USER_CANCELED' && self.xbmAnalytics) {
-                self.xbmAnalytics.sendEvent('export_error', {
-                    reason: 'download_interrupted',
-                    stage: 'download_' + request.reason
-                });
-            }
-            pending.reject(err);
+            sendResponse({ok: true});
+            return;
         }
-        sendResponse({ok: true});
-        return;
+
+        var err = new Error(request.message || 'Download failed.');
+        err.stage = request.reasonCode && String(request.reasonCode).indexOf('zip') === 0
+            ? 'zip'
+            : 'download';
+        err.reasonCode = request.reasonCode || 'zip_download_failed';
+        err.userCanceled = !!request.userCanceled;
+
+        var reportPromise = (request.reason && request.reason !== 'USER_CANCELED' && self.xbmAnalytics)
+            ? self.xbmAnalytics.sendEvent('export_error', {
+                reason: 'download_interrupted',
+                stage: 'download_' + request.reason
+            })
+            : Promise.resolve();
+
+        reportPromise.then(function() {
+            pending.reject(err);
+            sendResponse({ok: true});
+        });
+        return true;
     }
 });
 
@@ -322,7 +328,7 @@ async function runZipAndDownload(files, isIncremental) {
         });
 
         if (self.xbmAnalytics) {
-            self.xbmAnalytics.sendEvent('export_error', {
+            await self.xbmAnalytics.sendEvent('export_error', {
                 reason: reasonCode,
                 stage: stage
             });
