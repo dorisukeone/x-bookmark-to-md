@@ -60,7 +60,7 @@ Details:
 | `content.js` | Bookmarks page scroll + scrape |
 | `url-utils.js` | Shared URL normalization |
 | `background.js` | Service worker (install) |
-| `analytics.js` / `analytics-config.js` | Anonymous GA4 usage analytics (see [GA4 setup](docs/ga4-setup.md)) |
+| `analytics.js` / `analytics-config.js` | Anonymous GA4 usage analytics (see [GA4 setup](docs/ga4-setup.md), [event/parameter reference](docs/analytics.md)) |
 | `jszip.min.js` | ZIP generation |
 
 ## Chrome Web Store（パッケージのアップロード）
