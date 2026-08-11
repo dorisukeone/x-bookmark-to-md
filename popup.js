@@ -664,14 +664,26 @@ document.addEventListener('DOMContentLoaded', function() {
             retryExportBtn.hidden = false;
         }
         console.error('[X Bookmark to MD] Export failed at stage "' + (stage || 'unknown') + '":', message);
-        chrome.storage.local.set({
-            lastExportError: {
-                stage: stage || 'unknown',
-                reason: reasonCode || 'unknown',
-                message: message,
-                ts: Date.now()
-            }
-        });
+        var LAST_EXPORT_ERROR_MESSAGE_MAX_LENGTH = 500;
+        var storedMessage = typeof message === 'string' && message.length > LAST_EXPORT_ERROR_MESSAGE_MAX_LENGTH
+            ? message.slice(0, LAST_EXPORT_ERROR_MESSAGE_MAX_LENGTH)
+            : message;
+        try {
+            chrome.storage.local.set({
+                lastExportError: {
+                    stage: stage || 'unknown',
+                    reason: reasonCode || 'unknown',
+                    message: storedMessage,
+                    ts: Date.now()
+                }
+            }, function() {
+                if (chrome.runtime.lastError) {
+                    console.warn('[X Bookmark to MD] Failed to save lastExportError:', chrome.runtime.lastError);
+                }
+            });
+        } catch (storageError) {
+            console.warn('[X Bookmark to MD] Failed to save lastExportError:', storageError);
+        }
         if (self.xbmAnalytics) {
             self.xbmAnalytics.sendEvent('export_error', {
                 reason: reasonCode || 'unknown',
