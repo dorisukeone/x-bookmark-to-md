@@ -1,0 +1,50 @@
+{
+  "date": "2026-08-14",
+  "collectedAt": "2026-08-13T23:46:22.767Z",
+  "github": {
+    "stars": 6,
+    "openIssues": 0,
+    "forks": 2,
+    "watchers": 0,
+    "latestRelease": null,
+    "latestReleaseAgeDays": null
+  },
+  "extension": {
+    "manifestVersion": 3,
+    "version": "1.2.8",
+    "permissions": [
+      "activeTab",
+      "downloads",
+      "storage"
+    ],
+    "hostPermissions": [
+      "https://twitter.com/*",
+      "https://www.google-analytics.com/*",
+      "https://x.com/*"
+    ],
+    "permissionCount": 6,
+    "xSelectorCount": 5,
+    "jsLines": {
+      "background.js": 332,
+      "content.js": 519,
+      "popup.js": 683,
+      "url-utils.js": 67,
+      "jszip.min.js": 13
+    },
+    "totalJsLines": 1614,
+    "jszipVersion": "3.10.1"
+  },
+  "ga4": {
+    "enabled": true,
+    "propertyId": "547183074",
+    "activeUsers7d": null,
+    "activeUsers7dPrevious": null,
+    "eventCounts7d": {
+      "extension_updated": 23,
+      "extension_installed": 18,
+      "export_completed": 13,
+      "export_error": 8,
+      "export_canceled": 1
+    }
+  }
+}
