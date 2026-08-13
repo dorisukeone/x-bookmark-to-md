@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "validate": "tsx scripts/validate-extension.ts",
+    "verify:all": "tsx scripts/verify-all.ts",
     "typecheck": "tsc --noEmit",
     "report:daily": "tsx scripts/daily-report/index.ts",
     "security:issues": "tsx scripts/daily-report/security-issues.ts",
