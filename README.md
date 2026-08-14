@@ -77,6 +77,8 @@ chmod +x scripts/package-for-store.sh
 
 生成物: `x-bookmark-to-md-<version>-store.zip`（例: ルートに `manifest.json`、`icons/` など）
 
+`npm run validate`（`scripts/validate-extension.ts`）は生成された ZIP に `node_modules/` に加え、開発専用の `reports/`・`scripts/` ディレクトリが含まれていないことも検証し、混入時は非ゼロ終了コードで失敗します。
+
 - **手動の場合:** プロジェクト**中身**を選んで ZIP 化するか、`cd` してから上記スクリプトと同じファイルだけを `zip` に含めてください。**親フォルダを1段多く入れない**でください。
 
 ### プライバシーへの取り組み（権限の理由文・例）
