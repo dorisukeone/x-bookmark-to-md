@@ -2,7 +2,7 @@
 
 Chrome extension that exports your **X (Twitter) bookmarks** as individual Markdown files inside a single **ZIP** archive. Scraping runs entirely in the browser from the bookmarks page DOM (no official X API).
 
-**Current version:** 1.2.8 · Manifest V3
+**Current version:** 1.2.9 · Manifest V3
 
 ## Features
 
@@ -76,6 +76,12 @@ chmod +x scripts/package-for-store.sh
 ```
 
 生成物: `x-bookmark-to-md-<version>-store.zip`（例: ルートに `manifest.json`、`icons/` など）
+
+- **提出前チェック:** ZIP 化の前に、次のコマンドでストア提出前チェックスクリプト群（package/version/release 検証）をまとめて実行できます。個別スクリプトが未実装の間は、その旨のメッセージが表示されます。
+
+```bash
+npm run verify:all
+```
 
 - **手動の場合:** プロジェクト**中身**を選んで ZIP 化するか、`cd` してから上記スクリプトと同じファイルだけを `zip` に含めてください。**親フォルダを1段多く入れない**でください。
 
