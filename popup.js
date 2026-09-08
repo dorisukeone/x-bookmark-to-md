@@ -659,7 +659,11 @@ document.addEventListener('DOMContentLoaded', function() {
         pendingExportMeta = null;
         currentTabId = null;
         exportBtn.disabled = false;
-        updateStatus('error', message);
+        var displayMessage = message;
+        if (stage === 'connection' || stage === 'message_timeout') {
+            displayMessage = message + ' Please confirm the X/Twitter bookmarks page is open before retrying.';
+        }
+        updateStatus('error', displayMessage);
         if (retryExportBtn) {
             retryExportBtn.hidden = false;
         }
