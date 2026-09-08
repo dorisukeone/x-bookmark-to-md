@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "validate": "tsx scripts/validate-extension.ts",
+    "verify:icons": "node scripts/verify-icons.js",
     "typecheck": "tsc --noEmit",
     "report:daily": "tsx scripts/daily-report/index.ts",
     "security:issues": "tsx scripts/daily-report/security-issues.ts",
