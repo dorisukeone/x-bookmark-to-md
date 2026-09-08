@@ -194,9 +194,10 @@ document.addEventListener('DOMContentLoaded', function() {
     refreshExportHistoryMeta();
 
     chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-        var currentTab = tabs[0];
-        var isBookmarkPage = currentTab.url.includes('x.com/i/bookmarks') ||
-            currentTab.url.includes('twitter.com/i/bookmarks');
+        var currentTab = tabs && tabs[0];
+        var tabUrl = (currentTab && currentTab.url) || '';
+        var isBookmarkPage = tabUrl.includes('x.com/i/bookmarks') ||
+            tabUrl.includes('twitter.com/i/bookmarks');
 
         if (isBookmarkPage) {
             updateStatus('success', 'Ready to export.');
