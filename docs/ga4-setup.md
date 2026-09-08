@@ -9,6 +9,11 @@
 [`PRIVACY_POLICY.md`](../PRIVACY_POLICY.md) の「Anonymous usage analytics」を
 参照してください。ブックマーク本文・URL・ユーザー名などは一切送信しません。
 
+送出済みのイベント名・パラメータ(`export_error`の`stage`/`reason`内訳を含む)
+の一覧と、GA4管理画面でstage/reasonをカスタムディメンションとして登録し
+探索レポートで内訳を確認する手順は
+[`docs/analytics.md`](analytics.md) にまとめています。
+
 ## 1. GA4 プロパティとデータストリームの作成
 
 すでにお持ちの場合はスキップしてください。
