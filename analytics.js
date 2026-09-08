@@ -24,17 +24,23 @@
     }
 
     function sendEvent(name, params) {
-        if (!isConfigured()) return;
-        getClientId(function (clientId) {
-            var url = ENDPOINT +
-                '?measurement_id=' + encodeURIComponent(config.measurementId) +
-                '&api_secret=' + encodeURIComponent(config.apiSecret);
-            var body = JSON.stringify({
-                client_id: clientId,
-                events: [{ name: name, params: params || {} }]
-            });
-            fetch(url, { method: 'POST', body: body }).catch(function () {
-                // Analytics must never surface failures to the user.
+        if (!isConfigured()) return Promise.resolve();
+        return new Promise(function (resolve) {
+            getClientId(function (clientId) {
+                var url = ENDPOINT +
+                    '?measurement_id=' + encodeURIComponent(config.measurementId) +
+                    '&api_secret=' + encodeURIComponent(config.apiSecret);
+                var body = JSON.stringify({
+                    client_id: clientId,
+                    events: [{ name: name, params: params || {} }]
+                });
+                // keepalive lets the request outlive an MV3 service worker's idle
+                // shutdown so completion/error events aren't lost mid-flight.
+                fetch(url, { method: 'POST', body: body, keepalive: true })
+                    .catch(function () {
+                        // Analytics must never surface failures to the user.
+                    })
+                    .finally(resolve);
             });
         });
     }
