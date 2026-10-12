@@ -116,6 +116,12 @@ try {
   if (entries.some((entry) => entry.startsWith("node_modules/") || entry.includes("/node_modules/"))) {
     fail("Package ZIP must not contain node_modules");
   }
+  const devOnlyDirs = ["reports/", "scripts/"] as const;
+  for (const dir of devOnlyDirs) {
+    if (entries.some((entry) => entry.startsWith(dir) || entry.includes(`/${dir}`))) {
+      fail(`Package ZIP must not contain ${dir}`);
+    }
+  }
   const entrySet = new Set(entries);
   for (const file of references) {
     if (!entrySet.has(file)) fail(`Package ZIP is missing a manifest-referenced file: ${file}`);
