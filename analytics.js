@@ -25,6 +25,13 @@
 
     function sendEvent(name, params) {
         if (!isConfigured()) return;
+        params = params || {};
+        // Guarantee every export_error event carries a stage, so exceptions
+        // raised outside a specific stage's try/catch don't inflate the
+        // "unknown cause" bucket silently — they still show up as 'unknown'.
+        if (name === 'export_error' && !params.stage) {
+            params.stage = 'unknown';
+        }
         getClientId(function (clientId) {
             var url = ENDPOINT +
                 '?measurement_id=' + encodeURIComponent(config.measurementId) +
