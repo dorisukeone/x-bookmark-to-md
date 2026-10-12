@@ -68,6 +68,12 @@ Details:
 ストアは **ZIP の直下に `manifest.json` がある**こと必須です。  
 フォルダごと圧縮すると `あなたのフォルダ名/manifest.json` になり **拒否**されます。
 
+- **リリース前チェック:** `manifest.json` の `version` と README/store 配下のバージョン表記が一致しているか、次のコマンドで確認してください（不一致時は非ゼロ終了）。
+
+```bash
+pnpm verify-version
+```
+
 - **推奨:** リポジトリルートで次を実行すると、バージョン付きのストア用 ZIP が作られます。
 
 ```bash
