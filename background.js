@@ -14,13 +14,16 @@ var pendingDownload = null;
 
 chrome.runtime.onInstalled.addListener((details) => {
     console.log('X Bookmark Exporter installed');
+    var currentVersion = chrome.runtime.getManifest().version;
     if (details.reason === 'install') {
         self.xbmAnalytics.sendEvent('extension_installed', {
-            version: chrome.runtime.getManifest().version
+            version: currentVersion
         });
-    } else if (details.reason === 'update') {
+    } else if (details.reason === 'update' && details.previousVersion !== currentVersion) {
+        // Chrome can fire onInstalled with reason "update" without an actual
+        // version bump (e.g. re-signing); only count real version changes.
         self.xbmAnalytics.sendEvent('extension_updated', {
-            version: chrome.runtime.getManifest().version
+            version: currentVersion
         });
     }
 });
