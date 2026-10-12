@@ -57,7 +57,9 @@ vendored JSZipの更新は上流配布物の真正性確認が必要なため、
 
 拡張機能はインストール・エクスポート実行・エラー発生を匿名でGA4に送信します
 (ブックマーク本文は送信しません)。設定手順は
-[`docs/ga4-setup.md`](ga4-setup.md) を参照してください。
+[`docs/ga4-setup.md`](ga4-setup.md) を、送出済みイベント/パラメータ一覧と
+`export_error`のstage別内訳の集計手順は[`docs/analytics.md`](analytics.md)
+を参照してください。
 
 `GA4_PROPERTY_ID` / `GA4_SERVICE_ACCOUNT_EMAIL` /
 `GA4_SERVICE_ACCOUNT_PRIVATE_KEY` を設定すると、日次レポートに過去7日の
